@@ -9,12 +9,6 @@ import {
   Skeleton,
   Chip,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
   Snackbar,
   Alert
 } from '@mui/material';
@@ -44,7 +38,7 @@ const galleryImages = [
   },
   {
     id: 2,
-    img: 'https://images.unsplash.com/photo-1504198453319-5ce911bafcde',
+    img: 'https://images.unsplash.com/icon-1504198453319-5ce911bafcde',
     title: 'Mountain Majesty',
     category: 'Landscape',
     description: 'Breathtaking mountain view during golden hour with perfect lighting.',
@@ -53,7 +47,7 @@ const galleryImages = [
   },
   {
     id: 3,
-    img: 'https://images.unsplash.com/photo-1554080353-a576cf803bda',
+    img: 'https://images.unsplash.com/icon-1554080353-a576cf803bda',
     title: 'Natural Portrait',
     category: 'Portrait',
     description: 'Authentic portrait photography with natural lighting and emotional depth.',
@@ -62,7 +56,7 @@ const galleryImages = [
   },
   {
     id: 4,
-    img: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9',
+    img: 'https://images.unsplash.com/icon-1502082553048-f009c37129b9',
     title: 'Forest Pathway',
     category: 'Nature',
     description: 'Serene forest pathway captured with beautiful bokeh effect.',
@@ -71,7 +65,7 @@ const galleryImages = [
   },
   {
     id: 5,
-    img: 'https://images.unsplash.com/photo-1516483638261-f4dbaf036963',
+    img: 'https://images.unsplash.com/icon-1516483638261-f4dbaf036963',
     title: 'Italian Architecture',
     category: 'Architecture',
     description: 'Historic Italian architecture photographed with perfect symmetry.',
@@ -80,7 +74,7 @@ const galleryImages = [
   },
   {
     id: 6,
-    img: 'https://images.unsplash.com/photo-1526662092590-e314cbeaf8da',
+    img: 'https://images.unsplash.com/icon-1526662092590-e314cbeaf8da',
     title: 'Professional Headshot',
     category: 'Portrait',
     description: 'Corporate headshot with professional lighting and composition.',
@@ -89,7 +83,7 @@ const galleryImages = [
   },
   {
     id: 7,
-    img: 'https://images.unsplash.com/photo-1472214103451-9374bd1c798e',
+    img: 'https://images.unsplash.com/icon-1472214103451-9374bd1c798e',
     title: 'Coastal Cliffs',
     category: 'Landscape',
     description: 'Dramatic coastal cliffs with crashing waves and golden sunset.',
@@ -98,7 +92,7 @@ const galleryImages = [
   },
   {
     id: 8,
-    img: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716',
+    img: 'https://images.unsplash.com/icon-1433086966358-54859d0ed716',
     title: 'Forest Waterfall',
     category: 'Nature',
     description: 'Majestic waterfall in the forest with long exposure technique.',
@@ -107,7 +101,7 @@ const galleryImages = [
   },
   {
     id: 9,
-    img: 'https://images.unsplash.com/photo-1501594907352-04cda38ebc29',
+    img: 'https://images.unsplash.com/icon-1501594907352-04cda38ebc29',
     title: 'Wine Photography',
     category: 'Product',
     description: 'Elegant product photography for premium wine branding.',
@@ -116,7 +110,7 @@ const galleryImages = [
   },
   {
     id: 10,
-    img: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b',
+    img: 'https://images.unsplash.com/icon-1518837695005-2083093ee35b',
     title: 'Musical Atmosphere',
     category: 'Event',
     description: 'Live music event photography capturing the energy and emotion.',
@@ -125,7 +119,7 @@ const galleryImages = [
   },
   {
     id: 11,
-    img: 'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5',
+    img: 'https://images.unsplash.com/icon-1418065460487-3e41a6c84dc5',
     title: 'Mountain Cabin',
     category: 'Landscape',
     description: 'Cozy mountain cabin surrounded by autumn foliage.',
@@ -134,7 +128,7 @@ const galleryImages = [
   },
   {
     id: 12,
-    img: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05',
+    img: 'https://images.unsplash.com/icon-1470071459604-3b5ec3a7fe05',
     title: 'Misty Landscape',
     category: 'Nature',
     description: 'Atmospheric misty landscape with dramatic lighting.',
@@ -143,35 +137,12 @@ const galleryImages = [
   }
 ];
 
-// Print options
-const printSizes = [
-  { value: '4x6', label: '4x6 inches', priceMultiplier: 1 },
-  { value: '5x7', label: '5x7 inches', priceMultiplier: 1.5 },
-  { value: '8x10', label: '8x10 inches', priceMultiplier: 2 },
-  { value: '11x14', label: '11x14 inches', priceMultiplier: 3 },
-  { value: '16x20', label: '16x20 inches', priceMultiplier: 4 }
-];
-
-const paperTypes = [
-  { value: 'glossy', label: 'Glossy Photo Paper' },
-  { value: 'matte', label: 'Matte Photo Paper' },
-  { value: 'premium', label: 'Premium Lustre' },
-  { value: 'canvas', label: 'Canvas' }
-];
-
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loadedImages, setLoadedImages] = useState({});
   const [activeCategory, setActiveCategory] = useState('All');
-  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
-  const [orderOptions, setOrderOptions] = useState({
-    size: '8x10',
-    paperType: 'glossy',
-    quantity: 1,
-    message: ''
-  });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   
@@ -221,45 +192,20 @@ const Gallery = () => {
     setSelectedImage(galleryImages[prevIndex]);
   }, [currentIndex]);
 
-  // Open order dialog
-  const handleOpenOrderDialog = () => {
-    setOrderDialogOpen(true);
-  };
-
-  // Close order dialog
-  const handleCloseOrderDialog = () => {
-    setOrderDialogOpen(false);
-  };
-
-  // Handle order option changes
-  const handleOrderOptionChange = (field, value) => {
-    setOrderOptions(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Calculate total price
-  const calculateTotalPrice = () => {
-    if (!selectedImage) return 0;
-    const sizeMultiplier = printSizes.find(size => size.value === orderOptions.size)?.priceMultiplier || 1;
-    return (selectedImage.price * sizeMultiplier * orderOptions.quantity).toFixed(2);
-  };
-
-  // Handle order submission
-  const handleOrderSubmit = () => {
-    // In a real app, this would send the order to your backend
-    setSnackbarMessage(`Order placed for "${selectedImage.title}"! We'll contact you soon.`);
-    setSnackbarOpen(true);
-    setOrderDialogOpen(false);
-    
-    // Alternatively, navigate to order page with pre-filled data
-    // navigate('/order', { state: { image: selectedImage, options: orderOptions } });
-  };
-
-  // Handle quick order (direct to order page)
-  const handleQuickOrder = () => {
-    navigate('/order', { state: { image: selectedImage } });
+  // Handle redirect to order page
+  const handleOrderRedirect = () => {
+    if (selectedImage) {
+      // Close the modal first
+      handleCloseModal();
+      
+      // Navigate to order page with the selected image as state
+      navigate('/order', { 
+        state: { 
+          selectedImage: selectedImage,
+          fromGallery: true
+        } 
+      });
+    }
   };
 
   // Keyboard navigation
@@ -280,7 +226,7 @@ const Gallery = () => {
         case 'o':
         case 'O':
           if (selectedImage) {
-            handleOpenOrderDialog();
+            handleOrderRedirect();
           }
           break;
         default:
@@ -290,7 +236,7 @@ const Gallery = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedImage, handleCloseModal, handleNext, handlePrev]);
+  }, [selectedImage, handleCloseModal, handleNext, handlePrev, handleOrderRedirect]);
 
   // Handle fullscreen toggle
   const toggleFullscreen = () => {
@@ -357,6 +303,7 @@ const Gallery = () => {
                 fontWeight: 600,
                 '&:hover': {
                   transform: 'translateY(-2px)',
+
                   boxShadow: 2
                 },
                 transition: 'all 0.2s ease'
@@ -588,7 +535,7 @@ const Gallery = () => {
               <IconButton
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleOpenOrderDialog();
+                  handleOrderRedirect();
                 }}
                 sx={{
                   position: 'fixed',
@@ -674,7 +621,7 @@ const Gallery = () => {
                   startIcon={<Print />}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenOrderDialog();
+                    handleOrderRedirect();
                   }}
                   sx={{
                     backgroundColor: 'primary.main',
@@ -726,101 +673,7 @@ const Gallery = () => {
         )}
       </AnimatePresence>
 
-      {/* Order Dialog */}
-      <Dialog 
-        open={orderDialogOpen} 
-        onClose={handleCloseOrderDialog}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          Order Print: {selectedImage?.title}
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-            <TextField
-              select
-              label="Print Size"
-              value={orderOptions.size}
-              onChange={(e) => handleOrderOptionChange('size', e.target.value)}
-              fullWidth
-            >
-              {printSizes.map((size) => (
-                <MenuItem key={size.value} value={size.value}>
-                  {size.label}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              select
-              label="Paper Type"
-              value={orderOptions.paperType}
-              onChange={(e) => handleOrderOptionChange('paperType', e.target.value)}
-              fullWidth
-            >
-              {paperTypes.map((paper) => (
-                <MenuItem key={paper.value} value={paper.value}>
-                  {paper.label}
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              type="number"
-              label="Quantity"
-              value={orderOptions.quantity}
-              onChange={(e) => handleOrderOptionChange('quantity', parseInt(e.target.value))}
-              inputProps={{ min: 1, max: 100 }}
-              fullWidth
-            />
-
-            <TextField
-              label="Special Instructions (Optional)"
-              multiline
-              rows={3}
-              value={orderOptions.message}
-              onChange={(e) => handleOrderOptionChange('message', e.target.value)}
-              fullWidth
-            />
-
-            <Box sx={{ mt: 2, p: 2, backgroundColor: 'grey.100', borderRadius: 1 }}>
-              <Typography variant="h6" gutterBottom>
-                Order Summary
-              </Typography>
-              <Typography variant="body2">
-                Print: {selectedImage?.title}
-              </Typography>
-              <Typography variant="body2">
-                Size: {printSizes.find(s => s.value === orderOptions.size)?.label}
-              </Typography>
-              <Typography variant="body2">
-                Paper: {paperTypes.find(p => p.value === orderOptions.paperType)?.label}
-              </Typography>
-              <Typography variant="body2">
-                Quantity: {orderOptions.quantity}
-              </Typography>
-              <Typography variant="h6" sx={{ mt: 1, color: 'primary.main' }}>
-                Total: ${calculateTotalPrice()}
-              </Typography>
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseOrderDialog}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleOrderSubmit} 
-            variant="contained"
-            startIcon={<AddShoppingCart />}
-          >
-            Place Order
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar for order confirmation */}
+      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={4000}

@@ -5,422 +5,454 @@ import {
   Container, 
   Grid, 
   Typography,
-  Chip,
   useTheme,
   alpha,
   useMediaQuery,
-  Paper,
+  Card,
+  CardContent,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   IconButton,
-  Card,
-  CardContent,
-  Fade
+  Fade,
+  Chip,
+  Slide,
+  Zoom
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowForward,
   Close,
-  CameraAlt,
-  Celebration,
   Print,
-  AutoFixHigh,
-  Book,
-  Brush,
+  PhotoCamera,
+  DesignServices,
+  Check,
   Star,
-  CheckCircle
+  Launch,
+  Palette,
+  Gradient
 } from '@mui/icons-material';
 
-// Custom theme colors for photography/printing website
-const photoTheme = {
-  primary: '#2C3E50',     // Dark blue-black for professionalism
-  secondary: '#E74C3C',   // Vibrant red for calls-to-action
-  accent: '#3498DB',      // Bright blue for highlights
-  neutral: '#ECF0F1',     // Light gray for backgrounds
-  darkText: '#2C3E50',    // Dark text
-  lightText: '#7F8C8D',   // Light text
-  success: '#27AE60',     // Green for positive elements
-  warning: '#F39C12',     // Orange for alerts
+// Modern color palette
+const modernTheme = {
+  primary: '#2563eb',     // Modern blue
+  secondary: '#8b5cf6',   // Purple accent
+  accent: '#06b6d4',      // Cyan
+  neutral: '#f8fafc',     // Light background
+  darkText: '#1e293b',    // Dark text
+  lightText: '#64748b',   // Light text
+  success: '#10b981',     // Emerald
+  gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  gradient2: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  gradient3: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
 };
 
-const services = [
+// Service categories data with enhanced details
+const serviceCategories = [
   {
-    title: 'Portrait Photography',
-    description: 'Professional portrait sessions for individuals, families, and groups in our studio or on location.',
-    detailedDescription: 'Our portrait photography sessions are tailored to your specific needs. We offer both studio and outdoor options, with multiple outfit changes and professional lighting setups.',
-    price: '$150 - $400',
-    image: 'https://images.unsplash.com/photo-1554048612-b6a482bc67e5?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <CameraAlt />,
-    features: ['Studio Sessions', 'Outdoor Options', 'Multiple Outfits', 'Digital Delivery', 'Professional Editing', 'Print Options']
+    title: 'Printing Services',
+    icon: <Print sx={{ fontSize: 32 }} />,
+    gradient: modernTheme.gradient,
+    items: [
+      'T-shirts',
+      'Banners',
+      'Stickers',
+      'Mugs (prints on cups)',
+      'Business cards',
+      'Caps',
+      'Scarves',
+      'Certificates'
+    ],
+    description: 'Premium printing solutions with cutting-edge technology and fastest turnaround',
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    features: ['High-Quality Materials', 'Fast Turnaround', 'Eco-Friendly Options', 'Bulk Discounts']
   },
   {
-    title: 'Event Photography',
-    description: 'Capture your special events with our professional event photography services.',
-    detailedDescription: 'Our event photography team specializes in capturing the essence of your special occasion with a photojournalistic approach.',
-    price: '$300 - $1000',
-    image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <Celebration />,
-    features: ['Weddings', 'Corporate Events', 'Birthdays', 'Full Coverage', 'Digital Gallery', 'Photo Album Options']
+    title: 'Photo Services',
+    icon: <PhotoCamera sx={{ fontSize: 32 }} />,
+    gradient: modernTheme.gradient2,
+    items: [
+      'Onsite photography',
+      'Studio photography',
+      'Event photos (weddings, birthdays, graduations, etc.)',
+      'Frame photos (family portraits, decorative frames, etc.)',
+      'Other photography packages (premium editing, albums, etc.)'
+    ],
+    description: 'Capture life\'s precious moments with professional photography services',
+    image: 'https://images.unsplash.com/photo-1554048612-b6a482bc67e5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    features: ['Professional Equipment', 'Creative Direction', 'Premium Editing', 'Fast Delivery']
   },
   {
-    title: 'Photo Printing',
-    description: 'High-quality prints in various sizes and finishes to showcase your favorite photos.',
-    detailedDescription: 'Our professional printing service uses museum-quality archival papers and pigment-based inks that resist fading for generations.',
-    price: 'Starting at $5',
-    image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <Print />,
-    features: ['Premium Paper', 'Multiple Sizes', 'Matte/Glossy', 'Fast Turnaround', 'Archival Quality', 'Custom Cropping']
-  },
-  {
-    title: 'T-Shirt Printing',
-    description: 'Create custom t-shirts with your designs, photos, or logos.',
-    detailedDescription: 'Our custom t-shirt printing service allows you to create unique garments for events, businesses, or personal use.',
-    price: '$15 - $40 per shirt',
-    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <AutoFixHigh />,
-    features: ['Custom Designs', 'Multiple Garment Options', 'Bulk Discounts', 'Quick Turnaround', 'Premium Inks', 'Color Matching']
-  },
-  {
-    title: 'Custom Photo Books',
-    description: 'Create beautiful custom photo books to preserve your memories in a stylish format.',
-    detailedDescription: 'Our custom photo books are professionally designed to showcase your images in the best possible way.',
-    price: '$50 - $200',
-    image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <Book />,
-    features: ['Custom Layouts', 'Premium Cover', 'Multiple Sizes', 'Personalized Design', 'Various Paper Options', 'Durable Binding']
-  },
-  {
-    title: 'Digital Retouching',
-    description: 'Professional photo retouching to enhance your images and remove imperfections.',
-    detailedDescription: 'Our digital retouching services go beyond basic edits to transform your images.',
-    price: '$20 - $100 per photo',
-    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-    icon: <Brush />,
-    features: ['Skin Retouching', 'Background Editing', 'Color Correction', 'Object Removal', 'Professional Grading', 'Natural Results']
-  },
+    title: 'Design Services',
+    icon: <DesignServices sx={{ fontSize: 32 }} />,
+    gradient: modernTheme.gradient3,
+    items: [
+      'Logo design',
+      'Business card design',
+      'Certificate design',
+      'Marketing materials (flyers, posters, banners)',
+      'Custom graphic design'
+    ],
+    description: 'Transform your vision into stunning visual designs that make an impact',
+    image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+    features: ['Modern Designs', 'Multiple Revisions', 'Brand Consistency', 'Quick Turnaround']
+  }
 ];
 
 const Services = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [selectedService, setSelectedService] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [hoveredCard, setHoveredCard] = useState(null);
+  const [activeHover, setActiveHover] = useState(null);
 
-  const handleServiceClick = (service) => {
-    setSelectedService(service);
+  const handleCategoryClick = (category) => {
+    setSelectedCategory(category);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setSelectedService(null);
+    setSelectedCategory(null);
   };
 
   return (
-    <Box sx={{ py: 2, backgroundColor: '#F9FAFB' }}>
-      {/* Hero Section for Services */}
+    <Box sx={{ 
+      py: 2, 
+      backgroundColor: modernTheme.neutral,
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
+    }}>
+      {/* Modern Hero Section */}
       <Box
         sx={{
-          background: `linear-gradient(135deg, ${alpha(photoTheme.primary, 0.05)} 0%, ${alpha(photoTheme.accent, 0.05)} 100%)`,
-          py: 8,
+          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          py: { xs: 6, md: 10 },
           mb: 6,
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(circle at 20% 80%, rgba(37, 99, 235, 0.1) 0%, transparent 50%)',
+          }
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center' }}>
+          <Box sx={{ textAlign: 'center', position: 'relative', zIndex: 1 }}>
             <Chip
-              icon={<Star sx={{ color: photoTheme.secondary }} />}
-              label="Our Services"
+              icon={<Star sx={{ color: modernTheme.secondary }} />}
+              label="Premium Services"
               sx={{
                 mb: 3,
                 fontWeight: 600,
-                fontSize: '1rem',
-                height: 40,
+                fontSize: '0.9rem',
+                height: 36,
                 px: 2,
-                backgroundColor: alpha(photoTheme.primary, 0.1),
-                color: photoTheme.primary,
-                '& .MuiChip-icon': { color: `${photoTheme.secondary} !important` }
+                backgroundColor: 'white',
+                color: modernTheme.primary,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                '& .MuiChip-icon': { color: `${modernTheme.secondary} !important` }
               }}
             />
             
             <Typography
-              variant="h2"
+              variant="h1"
               gutterBottom
               sx={{
                 fontWeight: 800,
                 mb: 3,
-                background: `linear-gradient(135deg, ${photoTheme.primary} 0%, ${photoTheme.accent} 100%)`,
+                background: modernTheme.gradient,
                 backgroundClip: 'text',
                 textFillColor: 'transparent',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                fontSize: { xs: '2.5rem', md: '3.5rem' }
+                fontSize: { xs: '2.5rem', md: '4rem' },
+                lineHeight: 1.1
               }}
             >
-              Professional Photography & Printing
+              Elevate Your Brand
             </Typography>
             
             <Typography
               variant="h6"
               sx={{
                 mb: 4,
-                maxWidth: 700,
+                maxWidth: 600,
                 mx: 'auto',
-                color: photoTheme.lightText,
+                color: modernTheme.lightText,
                 fontWeight: 400,
-                lineHeight: 1.6
+                lineHeight: 1.6,
+                fontSize: '1.2rem'
               }}
             >
-              Discover our comprehensive range of services designed to capture and preserve your most precious moments
+              Discover our comprehensive suite of printing, photography, and design services tailored to bring your vision to life
             </Typography>
-            
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => navigate('/order')}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderRadius: 2,
-                  backgroundColor: photoTheme.secondary,
-                  boxShadow: `0 4px 12px ${alpha(photoTheme.secondary, 0.3)}`,
-                  '&:hover': {
-                    backgroundColor: alpha(photoTheme.secondary, 0.9),
-                    boxShadow: `0 6px 16px ${alpha(photoTheme.secondary, 0.4)}`,
-                  },
-                }}
-              >
-                Book a Service
-              </Button>
-              
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => navigate('/contact')}
-                sx={{
-                  px: 4,
-                  py: 1.5,
-                  fontWeight: 600,
-                  borderRadius: 2,
-                  borderWidth: 2,
-                  borderColor: photoTheme.primary,
-                  color: photoTheme.primary,
-                  '&:hover': {
-                    borderWidth: 2,
-                    borderColor: alpha(photoTheme.primary, 0.8),
-                    backgroundColor: alpha(photoTheme.primary, 0.05)
-                  }
-                }}
-              >
-                Contact Us
-              </Button>
-            </Box>
           </Box>
         </Container>
       </Box>
 
-      {/* Services Section with Alternating Layout */}
+      {/* Advanced Services Grid */}
       <Container maxWidth="lg" sx={{ py: 2, mb: 8 }}>
-        {services.map((service, index) => {
-          const isEven = index % 2 === 0;
-          
-          return (
-            <Fade in timeout={800} key={index}>
-              <Grid 
-                container 
-                spacing={4}
-                direction={isMobile ? 'column-reverse' : (isEven ? 'row' : 'row-reverse')}
-                sx={{ 
-                  mb: 10,
-                  alignItems: 'center',
-                  flexWrap: { xs: 'wrap', md: 'nowrap' }
-                }}
-              >
-                {/* Image Column */}
-                <Grid item xs={12} md={6}>
-                  <Paper
-                    elevation={4}
-                    sx={{
-                      borderRadius: 3,
-                      overflow: 'hidden',
-                      position: 'relative',
-                      transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                      '&:hover': {
-                        transform: 'translateY(-8px)',
-                        boxShadow: `0 12px 28px ${alpha(photoTheme.primary, 0.15)}`
-                      }
-                    }}
-                    onMouseEnter={() => setHoveredCard(index)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                  >
-                    <Box
-                      component="img"
-                      src={service.image}
-                      alt={service.title}
-                      sx={{
-                        width: '100%',
-                        height: 400,
-                        objectFit: 'cover',
-                        display: 'block',
-                        transition: 'transform 0.5s ease',
-                        transform: hoveredCard === index ? 'scale(1.05)' : 'scale(1)'
-                      }}
-                    />
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        top: 16,
-                        right: 16,
+        <Grid container spacing={3}>
+          {serviceCategories.map((category, index) => (
+            <Grid item xs={12} md={4} key={index}>
+              <Zoom in timeout={800} style={{ transitionDelay: `${index * 200}ms` }}>
+                <Card 
+                  sx={{ 
+                    height: '100%',
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                    background: 'white',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    '&:hover': {
+                      transform: 'translateY(-12px) scale(1.02)',
+                      boxShadow: `0 24px 48px ${alpha(modernTheme.primary, 0.15)}`,
+                    }
+                  }}
+                  onMouseEnter={() => setActiveHover(index)}
+                  onMouseLeave={() => setActiveHover(null)}
+                >
+                  {/* Gradient Header */}
+                  <Box sx={{ 
+                    height: 8,
+                    background: category.gradient,
+                    position: 'relative',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                    }
+                  }} />
+                  
+                  {/* Category Content */}
+                  <CardContent sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {/* Icon with Gradient Background */}
+                    <Box sx={{ 
+                      display: 'flex',
+                      alignItems: 'center',
+                      mb: 3,
+                      gap: 2
+                    }}>
+                      <Box sx={{
                         width: 60,
                         height: 60,
-                        borderRadius: '50%',
+                        borderRadius: 3,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: alpha(photoTheme.primary, 0.9),
+                        background: category.gradient,
                         color: 'white',
-                        boxShadow: 3
-                      }}
-                    >
-                      {service.icon}
-                    </Box>
-                  </Paper>
-                </Grid>
-                
-                {/* Content Column */}
-                <Grid item xs={12} md={6}>
-                  <Card 
-                    sx={{ 
-                      p: 4,
-                      borderRadius: 3,
-                      boxShadow: 'none',
-                      backgroundColor: 'transparent'
-                    }}
-                  >
-                    <CardContent sx={{ p: 0 }}>
+                        boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+                      }}>
+                        {category.icon}
+                      </Box>
                       <Typography 
-                        variant="h3" 
-                        component="h3" 
-                        gutterBottom
+                        variant="h4" 
                         sx={{ 
                           fontWeight: 700,
-                          mb: 2,
-                          color: photoTheme.primary,
-                          fontSize: { xs: '2rem', md: '2.5rem' }
+                          background: category.gradient,
+                          backgroundClip: 'text',
+                          textFillColor: 'transparent',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
                         }}
                       >
-                        {service.title}
+                        {category.title}
                       </Typography>
-                      
-                      <Typography 
-                        variant="body1" 
-                        sx={{
-                          mb: 3,
-                          lineHeight: 1.7,
-                          fontSize: '1.1rem',
-                          color: photoTheme.lightText
-                        }}
-                      >
-                        {service.description}
-                      </Typography>
-                      
-                      <Box sx={{ mb: 3 }}>
-                        {service.features.slice(0, 3).map((feature, idx) => (
-                          <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-                            <CheckCircle sx={{ fontSize: 22, color: photoTheme.success }} />
-                            <Typography variant="body1" sx={{ fontSize: '1rem', color: photoTheme.darkText }}>
-                              {feature}
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Box>
-                      
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                        <Typography 
-                          variant="h4" 
+                    </Box>
+                    
+                    {/* Description */}
+                    <Typography 
+                      variant="body1" 
+                      sx={{
+                        mb: 3,
+                        lineHeight: 1.6,
+                        color: modernTheme.lightText,
+                        flexGrow: 1
+                      }}
+                    >
+                      {category.description}
+                    </Typography>
+                    
+                    {/* Features Chips */}
+                    <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {category.features.map((feature, idx) => (
+                        <Chip
+                          key={idx}
+                          label={feature}
+                          size="small"
+                          sx={{
+                            backgroundColor: alpha(modernTheme.primary, 0.1),
+                            color: modernTheme.primary,
+                            fontWeight: 500,
+                            fontSize: '0.75rem'
+                          }}
+                        />
+                      ))}
+                    </Box>
+                    
+                    {/* Services List */}
+                    <Box sx={{ mb: 3 }}>
+                      {category.items.map((item, idx) => (
+                        <Box 
+                          key={idx}
                           sx={{ 
-                            fontWeight: 700,
-                            color: photoTheme.secondary
-                          }}
-                        >
-                          {service.price}
-                        </Typography>
-                        
-                        {index % 2 === 0 && (
-                          <Chip 
-                            label="Most Popular" 
-                            size="medium"
-                            sx={{ 
-                              fontWeight: 600,
-                              backgroundColor: alpha(photoTheme.warning, 0.15),
-                              color: photoTheme.warning
-                            }} 
-                          />
-                        )}
-                      </Box>
-                      
-                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                        <Button 
-                          size="large" 
-                          variant="contained"
-                          onClick={() => navigate('/order')}
-                          endIcon={<ArrowForward />}
-                          sx={{
-                            px: 4,
-                            py: 1.5,
-                            fontWeight: 600,
-                            borderRadius: 2,
-                            backgroundColor: photoTheme.secondary,
-                            boxShadow: `0 4px 12px ${alpha(photoTheme.secondary, 0.3)}`,
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 1.5, 
+                            mb: 1.5,
+                            transition: 'all 0.3s ease',
+                            padding: '4px 8px',
+                            borderRadius: 1,
                             '&:hover': {
-                              backgroundColor: alpha(photoTheme.secondary, 0.9),
-                              boxShadow: `0 6px 16px ${alpha(photoTheme.secondary, 0.4)}`,
-                            },
-                          }}
-                        >
-                          Book Now
-                        </Button>
-                        
-                        <Button 
-                          size="large" 
-                          variant="outlined"
-                          onClick={() => handleServiceClick(service)}
-                          sx={{
-                            px: 4,
-                            py: 1.5,
-                            fontWeight: 600,
-                            borderRadius: 2,
-                            borderWidth: 2,
-                            borderColor: photoTheme.primary,
-                            color: photoTheme.primary,
-                            '&:hover': {
-                              borderWidth: 2,
-                              borderColor: alpha(photoTheme.primary, 0.8),
-                              backgroundColor: alpha(photoTheme.primary, 0.05)
+                              backgroundColor: alpha(modernTheme.primary, 0.05),
+                              transform: 'translateX(4px)'
                             }
                           }}
                         >
-                          Learn More
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-            </Fade>
-          );
-        })}
+                          <Check sx={{ 
+                            fontSize: 18, 
+                            color: modernTheme.success,
+                            flexShrink: 0
+                          }} />
+                          <Typography variant="body2" sx={{ 
+                            color: modernTheme.darkText,
+                            fontSize: '0.9rem'
+                          }}>
+                            {item}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                    
+                    {/* Action Button */}
+                    <Button 
+                      fullWidth
+                      variant="contained"
+                      onClick={() => handleCategoryClick(category)}
+                      endIcon={<Launch />}
+                      sx={{
+                        py: 1.5,
+                        fontWeight: 600,
+                        borderRadius: 3,
+                        background: category.gradient,
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+                          background: category.gradient,
+                        },
+                      }}
+                    >
+                      Explore Services
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Zoom>
+            </Grid>
+          ))}
+        </Grid>
       </Container>
 
-      {/* Service Detail Dialog */}
+      {/* Modern CTA Section */}
+      <Container maxWidth="md" sx={{ mb: 10 }}>
+        <Slide direction="up" in timeout={1000}>
+          <Box
+            sx={{
+              background: modernTheme.gradient,
+              borderRadius: 4,
+              p: { xs: 4, md: 6 },
+              textAlign: 'center',
+              color: 'white',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              }
+            }}
+          >
+            <Box position="relative" zIndex={1}>
+              <Typography variant="h3" component="h3" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
+                Ready to Get Started?
+              </Typography>
+              
+              <Typography variant="body1" paragraph sx={{ mb: 4, opacity: 0.9, fontSize: '1.1rem' }}>
+                Let's create something amazing together. Get a free consultation and quote for your project.
+              </Typography>
+              
+              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  onClick={() => navigate('/order')}
+                  endIcon={<ArrowForward />}
+                  sx={{
+                    px: 5,
+                    py: 1.5,
+                    fontWeight: 600,
+                    borderRadius: 3,
+                    backgroundColor: 'white',
+                    color: modernTheme.primary,
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                    '&:hover': {
+                      backgroundColor: alpha('#fff', 0.9),
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+                    },
+                  }}
+                >
+                  Start Project
+                </Button>
+                
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={() => navigate('/contact')}
+                  sx={{
+                    px: 5,
+                    py: 1.5,
+                    fontWeight: 600,
+                    borderRadius: 3,
+                    borderWidth: 2,
+                    borderColor: 'white',
+                    color: 'white',
+                    '&:hover': {
+                      borderWidth: 2,
+                      borderColor: 'white',
+                      backgroundColor: alpha('#fff', 0.1),
+                    }
+                  }}
+                >
+                  Contact Us
+                </Button>
+              </Box>
+            </Box>
+          </Box>
+        </Slide>
+      </Container>
+
+      {/* Enhanced Dialog */}
       <Dialog 
         open={openDialog} 
         onClose={handleCloseDialog} 
@@ -428,160 +460,114 @@ const Services = () => {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
+            borderRadius: 4,
+            overflow: 'hidden',
+            boxShadow: '0 24px 48px rgba(0,0,0,0.2)',
           }
         }}
       >
-        {selectedService && (
+        {selectedCategory && (
           <>
             <DialogTitle sx={{ 
               m: 0, 
-              p: 3,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: photoTheme.primary,
-              color: 'white'
+              p: 0,
+              position: 'relative'
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box sx={{ 
-                  width: 40, 
-                  height: 40, 
-                  borderRadius: '50%', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center',
-                  backgroundColor: 'white',
-                  color: photoTheme.primary
-                }}>
-                  {selectedService.icon}
+              <Box sx={{
+                height: 200,
+                background: `linear-gradient(135deg, ${selectedCategory.gradient}), url(${selectedCategory.image})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                display: 'flex',
+                alignItems: 'flex-end',
+                p: 4,
+                position: 'relative',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(135deg, rgba(0,0,0,0.3) 0%, transparent 100%)',
+                }
+              }}>
+                <Box sx={{ position: 'relative', zIndex: 1, color: 'white' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                    <Box sx={{ 
+                      width: 50, 
+                      height: 50, 
+                      borderRadius: 3,
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      backgroundColor: 'white',
+                      color: modernTheme.primary
+                    }}>
+                      {selectedCategory.icon}
+                    </Box>
+                    <Typography variant="h3" sx={{ fontWeight: 700 }}>
+                      {selectedCategory.title}
+                    </Typography>
+                  </Box>
+                  <Typography variant="h6" sx={{ opacity: 0.9 }}>
+                    {selectedCategory.description}
+                  </Typography>
                 </Box>
-                <Typography variant="h4" component="h2" sx={{ fontWeight: 700 }}>
-                  {selectedService.title}
-                </Typography>
               </Box>
               <IconButton
                 aria-label="close"
                 onClick={handleCloseDialog}
                 sx={{
+                  position: 'absolute',
+                  top: 16,
+                  right: 16,
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(10px)',
                   color: 'white',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.3)',
+                  },
                 }}
               >
                 <Close />
               </IconButton>
             </DialogTitle>
-            <DialogContent dividers sx={{ p: 0 }}>
-              <Box sx={{ position: 'relative' }}>
-                <Box
-                  component="img"
-                  src={selectedService.image}
-                  alt={selectedService.title}
-                  sx={{
-                    width: '100%',
-                    height: 300,
-                    objectFit: 'cover'
-                  }}
-                />
-              </Box>
-              <Box sx={{ p: 3 }}>
-                <Typography variant="body1" paragraph sx={{ lineHeight: 1.8, fontSize: '1.1rem', mb: 3, color: photoTheme.darkText }}>
-                  {selectedService.detailedDescription}
-                </Typography>
-                
-                <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 2, color: photoTheme.primary }}>
-                  Service Includes:
-                </Typography>
-                
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  {selectedService.features.map((feature, idx) => (
-                    <Grid item xs={12} sm={6} key={idx}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CheckCircle sx={{ fontSize: 20, color: photoTheme.success }} />
-                        <Typography variant="body2" sx={{ color: photoTheme.darkText }}>
-                          {feature}
-                        </Typography>
-                      </Box>
-                    </Grid>
+            <DialogContent sx={{ p: 4 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: modernTheme.primary }}>
+                    Services Included
+                  </Typography>
+                  {selectedCategory.items.map((item, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Check sx={{ color: modernTheme.success, flexShrink: 0 }} />
+                      <Typography variant="body1">{item}</Typography>
+                    </Box>
                   ))}
                 </Grid>
-                
-                <Box sx={{ 
-                  backgroundColor: alpha(photoTheme.primary, 0.1), 
-                  p: 2, 
-                  borderRadius: 2,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between'
-                }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: photoTheme.secondary }}>
-                    {selectedService.price}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: modernTheme.primary }}>
+                    Key Features
                   </Typography>
-                  <Button 
-                    variant="contained"
-                    endIcon={<ArrowForward />}
-                    onClick={() => {
-                      handleCloseDialog();
-                      navigate('/order');
-                    }}
-                    sx={{ 
-                      borderRadius: 2,
-                      backgroundColor: photoTheme.secondary,
-                      '&:hover': {
-                        backgroundColor: alpha(photoTheme.secondary, 0.9),
-                      },
-                    }}
-                  >
-                    Book This Service
-                  </Button>
-                </Box>
-              </Box>
+                  {selectedCategory.features.map((feature, idx) => (
+                    <Chip
+                      key={idx}
+                      label={feature}
+                      sx={{
+                        m: 0.5,
+                        backgroundColor: alpha(modernTheme.primary, 0.1),
+                        color: modernTheme.primary,
+                        fontWeight: 500
+                      }}
+                    />
+                  ))}
+                </Grid>
+              </Grid>
             </DialogContent>
           </>
         )}
       </Dialog>
-
-      {/* Call to Action Section */}
-      <Container maxWidth="md" sx={{ mb: 10 }}>
-        <Box
-          sx={{
-            background: `linear-gradient(135deg, ${photoTheme.primary} 0%, ${photoTheme.accent} 100%)`,
-            borderRadius: 4,
-            p: 5,
-            textAlign: 'center',
-            color: 'white',
-            boxShadow: 4,
-          }}
-        >
-          <Typography variant="h4" component="h3" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
-            Can't Find What You're Looking For?
-          </Typography>
-          
-          <Typography variant="body1" paragraph sx={{ mb: 4, opacity: 0.9 }}>
-            We offer custom photography and printing solutions tailored to your specific needs. 
-            Contact us to discuss your unique project requirements.
-          </Typography>
-          
-          <Button
-            variant="contained"
-            color="secondary"
-            size="large"
-            onClick={() => navigate('/contact')}
-            endIcon={<ArrowForward />}
-            sx={{
-              px: 5,
-              py: 1.5,
-              fontWeight: 600,
-              borderRadius: 2,
-              backgroundColor: photoTheme.secondary,
-              '&:hover': {
-                backgroundColor: alpha(photoTheme.secondary, 0.9),
-              },
-            }}
-          >
-            Request Custom Service
-          </Button>
-        </Box>
-      </Container>
     </Box>
   );
 };
