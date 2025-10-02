@@ -49,9 +49,12 @@ import {
   ArrowBack,
   DesignServices,
   Description,
-  Image
+  Image,
+  Login,
+  PersonAdd
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../context/AuthContext'; // Add this import
 
 // Modern theme matching the Services page
 const modernTheme = {
@@ -159,6 +162,7 @@ const Order = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user, isAuthenticated, login } = useAuth(); // Add auth context
   
   // No default service selected initially
   const [selectedService, setSelectedService] = useState(null);
@@ -168,6 +172,11 @@ const Order = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [showServiceSelector, setShowServiceSelector] = useState(false);
   const [inputMethod, setInputMethod] = useState('upload'); // 'upload' or 'describe'
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const [orderDetails, setOrderDetails] = useState({
     serviceType: '',
     customerName: '',
@@ -179,6 +188,18 @@ const Order = () => {
   });
 
   const steps = ['Select Service', 'Provide Details', 'Review & Confirm'];
+
+  // Auto-fill user info when authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      setOrderDetails(prev => ({
+        ...prev,
+        customerName: user.name || '',
+        email: user.email || '',
+        phone: user.phone || ''
+      }));
+    }
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     if (selectedService) {
@@ -223,7 +244,14 @@ const Order = () => {
     }));
   };
 
+  // Modified handleNext to check authentication
   const handleNext = () => {
+    // If user is not authenticated and trying to proceed beyond service selection
+    if (!isAuthenticated && activeStep >= 0) {
+      setLoginDialogOpen(true);
+      return;
+    }
+    
     setActiveStep(prev => prev + 1);
   };
 
@@ -231,12 +259,20 @@ const Order = () => {
     setActiveStep(prev => prev - 1);
   };
 
+  // Modified handleServiceSelect to check authentication
   const handleServiceSelect = (service) => {
+    // If user is not authenticated, show login dialog but remember the service
+    if (!isAuthenticated) {
+      setSelectedService(service);
+      setLoginDialogOpen(true);
+      return;
+    }
+    
     setSelectedService(service);
     setShowServiceSelector(false);
     setFiles([]);
     setSelectedOptions({});
-    setInputMethod('upload'); // Reset to upload by default
+    setInputMethod('upload');
   };
 
   const calculatePrice = () => {
@@ -338,6 +374,42 @@ const Order = () => {
     });
   };
 
+  // Login functions
+  const handleLoginFromOrder = async (e) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+    
+    const result = await login(loginData.email, loginData.password);
+    
+    if (result.success) {
+      setLoginDialogOpen(false);
+      setLoginData({ email: '', password: '' });
+      // If a service was selected before login, continue with it
+      if (selectedService) {
+        setShowServiceSelector(false);
+      }
+    } else {
+      setLoginError(result.error);
+    }
+    
+    setLoginLoading(false);
+  };
+
+  const fillDemoCredentials = (role) => {
+    if (role === 'admin') {
+      setLoginData({
+        email: 'admin@josi.com',
+        password: 'admin123'
+      });
+    } else {
+      setLoginData({
+        email: 'user@josi.com',
+        password: 'user123'
+      });
+    }
+  };
+
   const ServiceSelectorDialog = () => (
     <Dialog 
       open={showServiceSelector} 
@@ -396,6 +468,136 @@ const Order = () => {
       </DialogContent>
     </Dialog>
   );
+
+  // Login Dialog Component
+  const LoginDialog = () => (
+    <Dialog 
+      open={loginDialogOpen} 
+      onClose={() => setLoginDialogOpen(false)}
+      maxWidth="sm"
+      fullWidth
+    >
+      <DialogTitle sx={{ 
+        background: modernTheme.gradient,
+        color: 'white',
+        textAlign: 'center',
+        fontWeight: 700
+      }}>
+        Login Required
+      </DialogTitle>
+      <DialogContent sx={{ p: 4 }}>
+        <Typography variant="h6" gutterBottom align="center">
+          Please login to continue with your order
+        </Typography>
+        {selectedService && (
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
+            You need to be logged in to place an order for <strong>{selectedService.name}</strong>
+          </Typography>
+        )}
+
+        {/* Demo Credentials */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Demo Credentials:
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => fillDemoCredentials('admin')}
+              sx={{ flex: 1 }}
+            >
+              Admin
+            </Button>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => fillDemoCredentials('user')}
+              sx={{ flex: 1 }}
+            >
+              User
+            </Button>
+          </Box>
+        </Box>
+
+        <Box component="form" onSubmit={handleLoginFromOrder}>
+          {loginError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {loginError}
+            </Alert>
+          )}
+          
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            id="login-email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
+            value={loginData.email}
+            onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="login-password"
+            autoComplete="current-password"
+            value={loginData.password}
+            onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+          />
+          
+          <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={() => setLoginDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={loginLoading}
+              startIcon={<Login />}
+            >
+              {loginLoading ? 'Logging in...' : 'Login & Continue'}
+            </Button>
+          </Box>
+        </Box>
+
+        <Divider sx={{ my: 3 }}>
+          <Typography variant="body2" color="text.secondary">
+            OR
+          </Typography>
+        </Divider>
+
+        <Box sx={{ textAlign: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Don't have an account?
+          </Typography>
+          <Button
+            variant="text"
+            startIcon={<PersonAdd />}
+            onClick={() => {
+              setLoginDialogOpen(false);
+              navigate('/register');
+            }}
+            sx={{ fontWeight: 600 }}
+          >
+            Create New Account
+          </Button>
+        </Box>
+      </DialogContent>
+    </Dialog>
+  );
+
+
 
   const renderServiceOptions = () => {
     if (!selectedService) return null;
@@ -841,6 +1043,18 @@ const Order = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, minHeight: '100vh' }}>
+      {/* Add authentication status */}
+      {isAuthenticated && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <Chip
+            icon={<CheckCircle />}
+            label={`Logged in as ${user?.name}`}
+            color="success"
+            variant="outlined"
+          />
+        </Box>
+      )}
+
       <Box sx={{ textAlign: 'center', mb: 6 }}>
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -874,11 +1088,37 @@ const Order = () => {
               fontSize: '1.2rem'
             }}
           >
-            {selectedService ? `Configure your ${selectedService.name.toLowerCase()} order` : 'Select a service to get started'}
+            {!isAuthenticated ? 'Please login to place an order' : selectedService ? `Configure your ${selectedService.name.toLowerCase()} order` : 'Select a service to get started'}
           </Typography>
+
+          {/* Show login prompt if not authenticated */}
+          {!isAuthenticated && !selectedService && (
+            <Alert 
+              severity="info" 
+              sx={{ 
+                maxWidth: 400, 
+                mx: 'auto', 
+                mb: 3,
+                '& .MuiAlert-message': { width: '100%' }
+              }}
+              action={
+                <Button 
+                  color="inherit" 
+                  size="small"
+                  onClick={() => setLoginDialogOpen(true)}
+                  startIcon={<Login />}
+                >
+                  Login
+                </Button>
+              }
+            >
+              You need to login to place an order
+            </Alert>
+          )}
         </motion.div>
       </Box>
 
+      <LoginDialog />
       <ServiceSelectorDialog />
 
       {isSubmitted ? (
@@ -941,9 +1181,17 @@ const Order = () => {
           )}
 
           <Stepper activeStep={activeStep} sx={{ mb: 6 }}>
-            {steps.map((label) => (
+            {steps.map((label, index) => (
               <Step key={label}>
-                <StepLabel>{label}</StepLabel>
+                <StepLabel 
+                  sx={{
+                    '& .MuiStepLabel-label': {
+                      color: !isAuthenticated && index > 0 ? 'text.disabled' : 'text.primary'
+                    }
+                  }}
+                >
+                  {label}
+                </StepLabel>
               </Step>
             ))}
           </Stepper>
@@ -955,6 +1203,8 @@ const Order = () => {
               background: `linear-gradient(135deg, ${modernTheme.neutral} 0%, #ffffff 100%)`,
               borderRadius: 4,
               boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
+              opacity: !isAuthenticated && activeStep > 0 ? 0.6 : 1,
+              pointerEvents: !isAuthenticated && activeStep > 0 ? 'none' : 'auto'
             }}
           >
             <AnimatePresence mode="wait">
@@ -972,7 +1222,10 @@ const Order = () => {
                   
                   {!selectedService && (
                     <Alert severity="info" sx={{ mb: 4, borderRadius: 3 }}>
-                      Please select a service category to continue with your order.
+                      {!isAuthenticated 
+                        ? 'Please login first to select a service and place an order' 
+                        : 'Please select a service category to continue with your order'
+                      }
                     </Alert>
                   )}
                   
@@ -983,16 +1236,17 @@ const Order = () => {
                           sx={{ 
                             textAlign: 'center',
                             p: 4,
-                            cursor: 'pointer',
+                            cursor: isAuthenticated ? 'pointer' : 'not-allowed',
                             transition: 'all 0.3s ease',
                             border: selectedService?.id === service.id ? `3px solid ${service.gradient}` : '1px solid #e2e8f0',
                             background: selectedService?.id === service.id ? `${service.gradient}15` : 'white',
-                            '&:hover': {
+                            opacity: isAuthenticated ? 1 : 0.7,
+                            '&:hover': isAuthenticated ? {
                               transform: 'translateY(-8px)',
                               boxShadow: '0 16px 32px rgba(0,0,0,0.15)'
-                            }
+                            } : {}
                           }}
-                          onClick={() => handleServiceSelect(service)}
+                          onClick={() => isAuthenticated && handleServiceSelect(service)}
                         >
                           <Avatar sx={{ 
                             width: 80, 
@@ -1012,6 +1266,7 @@ const Order = () => {
                               background: service.gradient,
                               borderRadius: 3
                             }}
+                            disabled={!isAuthenticated}
                           >
                             {selectedService?.id === service.id ? 'Selected' : 'Select Service'}
                           </Button>

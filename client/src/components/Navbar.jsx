@@ -14,21 +14,22 @@ import {
   useTheme,
   useMediaQuery,
   Avatar,
+  Menu,
+  MenuItem,
+  Divider,
+  Chip,
+  CircularProgress,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import LogoutIcon from "@mui/icons-material/Logout";
+import DashboardIcon from "@mui/icons-material/Dashboard";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import { styled } from "@mui/material/styles";
 
-// Import your profile photo
 import profilePhoto from "../assets/profile.jpg";
-
-const navItems = [
-  { name: "Home", path: "/" },
-  { name: "Services", path: "/services" },
-  { name: "Gallery", path: "/gallery" },
-  { name: "Order", path: "/order" },
-  { name: "Contact", path: "/contact" },
-  { name: "Admin", path: "/admin" },
-];
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const LogoContainer = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -65,12 +66,65 @@ const LogoText = styled(Typography)(({ theme }) => ({
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [anchorEl, setAnchorEl] = useState(null);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const { user, logout, isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  const navItems = [
+    { name: "Home", path: "/" },
+    { name: "Services", path: "/services" },
+    { name: "Gallery", path: "/gallery" },
+    { name: "Order", path: "/order" },
+    { name: "Contact", path: "/contact" },
+  ];
+
+  // Add Admin link only for admin users
+  if (user?.role === 'admin') {
+    navItems.push({ 
+      name: "Admin", 
+      path: "/admin",
+      icon: <AdminPanelSettingsIcon sx={{ fontSize: 18, mr: 1 }} />
+    });
+  }
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
+
+  const handleProfileMenuOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleProfileMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+    handleProfileMenuClose();
+    setMobileOpen(false);
+  };
+
+  const handleDashboard = () => {
+    navigate(user?.role === 'admin' ? '/admin' : '/');
+    handleProfileMenuClose();
+  };
+
+  // Show loading spinner while auth is loading
+  if (loading) {
+    return (
+      <AppBar position="static" sx={{ mb: 4, backgroundColor: "#1A2E40" }}>
+        <Toolbar>
+          <Box display="flex" alignItems="center" justifyContent="center" width="100%">
+            <CircularProgress size={24} sx={{ color: 'white' }} />
+          </Box>
+        </Toolbar>
+      </AppBar>
+    );
+  }
 
   const drawer = (
     <Box onClick={handleDrawerToggle} sx={{ textAlign: "center" }}>
@@ -89,20 +143,184 @@ const Navbar = () => {
           </LogoText>
         </Box>
       </Box>
+      
+      <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.3)', mb: 2 }} />
+      
       <List>
         {navItems.map((item) => (
           <ListItem key={item.name} disablePadding>
             <ListItemButton
               component={Link}
               to={item.path}
-              sx={{ textAlign: "center" }}
+              sx={{ 
+                textAlign: "center",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 255, 255, 0.1)",
+                }
+              }}
             >
-              <ListItemText primary={item.name} sx={{ color: "white" }} />
+              <ListItemText 
+                primary={item.name} 
+                sx={{ color: "white" }} 
+              />
             </ListItemButton>
           </ListItem>
         ))}
+        
+        {/* Mobile Auth Section */}
+        <Divider sx={{ backgroundColor: 'rgba(255,255,255,0.3)', my: 1 }} />
+        
+        {isAuthenticated ? (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={handleDashboard}
+                sx={{ 
+                  textAlign: "center",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }
+                }}
+              >
+                <DashboardIcon sx={{ fontSize: 20, mr: 2, color: 'white' }} />
+                <ListItemText 
+                  primary={`Dashboard (${user?.name})`} 
+                  sx={{ color: "white", textAlign: 'left' }} 
+                />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                onClick={handleLogout}
+                sx={{ 
+                  textAlign: "center",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }
+                }}
+              >
+                <LogoutIcon sx={{ fontSize: 20, mr: 2, color: 'white' }} />
+                <ListItemText 
+                  primary="Logout" 
+                  sx={{ color: "white", textAlign: 'left' }} 
+                />
+              </ListItemButton>
+            </ListItem>
+            {user?.role === 'admin' && (
+              <ListItem disablePadding>
+                <Box sx={{ px: 2, py: 1, width: '100%' }}>
+                  <Chip 
+                    label="ADMIN" 
+                    size="small" 
+                    color="warning" 
+                    sx={{ 
+                      fontWeight: 'bold',
+                      backgroundColor: '#ff9800',
+                      color: 'white'
+                    }} 
+                  />
+                </Box>
+              </ListItem>
+            )}
+          </>
+        ) : (
+          <>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/login"
+                sx={{ 
+                  textAlign: "center",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }
+                }}
+              >
+                <AccountCircleIcon sx={{ fontSize: 20, mr: 2, color: 'white' }} />
+                <ListItemText 
+                  primary="Login" 
+                  sx={{ color: "white", textAlign: 'left' }} 
+                />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                to="/register"
+                sx={{ 
+                  textAlign: "center",
+                  "&:hover": {
+                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+                  }
+                }}
+              >
+                <AccountCircleIcon sx={{ fontSize: 20, mr: 2, color: 'white' }} />
+                <ListItemText 
+                  primary="Register" 
+                  sx={{ color: "white", textAlign: 'left' }} 
+                />
+              </ListItemButton>
+            </ListItem>
+          </>
+        )}
       </List>
     </Box>
+  );
+
+  const profileMenu = (
+    <Menu
+      anchorEl={anchorEl}
+      open={Boolean(anchorEl)}
+      onClose={handleProfileMenuClose}
+      onClick={handleProfileMenuClose}
+      transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+      anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      PaperProps={{
+        elevation: 3,
+        sx: {
+          mt: 1.5,
+          minWidth: 200,
+          '& .MuiMenuItem-root': {
+            px: 2,
+            py: 1,
+          },
+        },
+      }}
+    >
+      <MenuItem disabled>
+        <Box>
+          <Typography variant="subtitle1" fontWeight="bold">
+            {user?.name}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {user?.email}
+          </Typography>
+          {user?.role === 'admin' && (
+            <Chip 
+              label="ADMIN" 
+              size="small" 
+              color="warning" 
+              sx={{ 
+                mt: 0.5,
+                fontSize: '0.7rem',
+                height: 20,
+                fontWeight: 'bold'
+              }} 
+            />
+          )}
+        </Box>
+      </MenuItem>
+      <Divider />
+      <MenuItem onClick={handleDashboard}>
+        <DashboardIcon sx={{ mr: 2, fontSize: 20 }} />
+        Dashboard
+      </MenuItem>
+      <Divider />
+      <MenuItem onClick={handleLogout}>
+        <LogoutIcon sx={{ mr: 2, fontSize: 20 }} />
+        Logout
+      </MenuItem>
+    </Menu>
   );
 
   return (
@@ -119,6 +337,7 @@ const Navbar = () => {
             <MenuIcon />
           </IconButton>
         )}
+        
         <LogoContainer
           component={Link}
           to="/"
@@ -141,46 +360,131 @@ const Navbar = () => {
             </Box>
           )}
         </LogoContainer>
+        
         {!isMobile && (
-          <Box sx={{ display: "flex" }}>
-            {navItems.map((item) => (
-              <Typography
-                key={item.name}
-                component={Link}
-                to={item.path}
-                variant="body1"
-                sx={{
-                  color: "white",
-                  mx: 1.5,
-                  textDecoration: "none",
-                  padding: "8px 12px",
-                  borderRadius: "4px",
-                  transition: "all 0.3s ease",
-                  fontSize: "1rem",
-                  fontWeight: 500,
-                  "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.1)",
+          <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
+            {/* Navigation Links */}
+            <Box sx={{ display: 'flex', flexGrow: 1 }}>
+              {navItems.map((item) => (
+                <Typography
+                  key={item.name}
+                  component={Link}
+                  to={item.path}
+                  variant="body1"
+                  sx={{
+                    color: "white",
+                    mx: 1.5,
                     textDecoration: "none",
-                  },
-                }}
-              >
-                {item.name}
-              </Typography>
-            ))}
+                    padding: "8px 12px",
+                    borderRadius: "4px",
+                    transition: "all 0.3s ease",
+                    fontSize: "1rem",
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    "&:hover": {
+                      backgroundColor: "rgba(255, 255, 255, 0.1)",
+                      textDecoration: "none",
+                    },
+                  }}
+                >
+                  {item.icon && item.icon}
+                  {item.name}
+                </Typography>
+              ))}
+            </Box>
+
+            {/* Desktop Auth Section */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {isAuthenticated ? (
+                <>
+                  <IconButton
+                    onClick={handleProfileMenuOpen}
+                    sx={{
+                      color: "white",
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                      },
+                    }}
+                  >
+                    <AccountCircleIcon />
+                  </IconButton>
+                  {user?.role === 'admin' && (
+                    <Chip 
+                      label="ADMIN" 
+                      size="small" 
+                      color="warning" 
+                      sx={{ 
+                        fontWeight: 'bold',
+                        backgroundColor: '#ff9800',
+                        color: 'white'
+                      }} 
+                    />
+                  )}
+                </>
+              ) : (
+                <>
+                  <Typography
+                    component={Link}
+                    to="/login"
+                    variant="body1"
+                    sx={{
+                      color: "white",
+                      textDecoration: "none",
+                      padding: "8px 16px",
+                      borderRadius: "4px",
+                      transition: "all 0.3s ease",
+                      fontSize: "1rem",
+                      fontWeight: 500,
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        textDecoration: "none",
+                      },
+                    }}
+                  >
+                    Login
+                  </Typography>
+                  <Typography
+                    component={Link}
+                    to="/register"
+                    variant="body1"
+                    sx={{
+                      color: "white",
+                      textDecoration: "none",
+                      padding: "8px 16px",
+                      borderRadius: "4px",
+                      transition: "all 0.3s ease",
+                      fontSize: "1rem",
+                      fontWeight: 500,
+                      border: "1px solid rgba(255, 255, 255, 0.3)",
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        textDecoration: "none",
+                        border: "1px solid rgba(255, 255, 255, 0.5)",
+                      },
+                    }}
+                  >
+                    Register
+                  </Typography>
+                </>
+              )}
+            </Box>
           </Box>
         )}
       </Toolbar>
+
+      {/* Mobile Drawer */}
       <Drawer
         variant="temporary"
         open={mobileOpen}
         onClose={handleDrawerToggle}
         ModalProps={{
-          keepMounted: true, // Better open performance on mobile.
+          keepMounted: true,
         }}
         sx={{
           "& .MuiDrawer-paper": { 
             boxSizing: "border-box", 
-            width: 240,
+            width: 280,
             backgroundColor: "#1A2E40",
             color: "white"
           },
@@ -188,6 +492,9 @@ const Navbar = () => {
       >
         {drawer}
       </Drawer>
+
+      {/* Profile Menu */}
+      {profileMenu}
     </AppBar>
   );
 };
