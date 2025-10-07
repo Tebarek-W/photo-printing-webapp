@@ -6,8 +6,10 @@ import Gallery from '../pages/Gallery';
 import Order from '../pages/Order';
 import Contact from '../pages/Contact';
 import AdminDashboard from '../pages/Admin/Dashboard';
+import UserDashboard from '../pages/User/Dashboard';
 import Login from '../pages/Auth/Login';
 import Register from '../pages/Auth/Register';
+import ProtectedRoute from '../components/ProtectedRoute';
 
 const router = createBrowserRouter([
   {
@@ -21,7 +23,19 @@ const router = createBrowserRouter([
       { path: '/contact', element: <Contact /> },
       { 
         path: '/admin', 
-        element: <AdminDashboard />,
+        element: (
+          <ProtectedRoute requireAdmin={true}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      { 
+        path: '/user/dashboard', 
+        element: (
+          <ProtectedRoute>
+            <UserDashboard />
+          </ProtectedRoute>
+        ),
       },
     ],
   },

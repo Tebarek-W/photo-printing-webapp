@@ -19,6 +19,7 @@ import {
   Divider,
   Chip,
   CircularProgress,
+  Button // Added missing import
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
@@ -80,6 +81,14 @@ const Navbar = () => {
     { name: "Contact", path: "/contact" },
   ];
 
+  // Add My Messages link for logged-in users (non-admin)
+  if (isAuthenticated && user?.role !== 'admin') {
+    navItems.push({ 
+      name: "My Messages", 
+      path: "/user/dashboard"
+    });
+  }
+
   // Add Admin link only for admin users
   if (user?.role === 'admin') {
     navItems.push({ 
@@ -109,7 +118,11 @@ const Navbar = () => {
   };
 
   const handleDashboard = () => {
-    navigate(user?.role === 'admin' ? '/admin' : '/');
+    if (user?.role === 'admin') {
+      navigate('/admin');
+    } else {
+      navigate('/user/dashboard');
+    }
     handleProfileMenuClose();
   };
 
@@ -159,6 +172,7 @@ const Navbar = () => {
                 }
               }}
             >
+              {item.icon && item.icon}
               <ListItemText 
                 primary={item.name} 
                 sx={{ color: "white" }} 
@@ -313,7 +327,7 @@ const Navbar = () => {
       <Divider />
       <MenuItem onClick={handleDashboard}>
         <DashboardIcon sx={{ mr: 2, fontSize: 20 }} />
-        Dashboard
+        {user?.role === 'admin' ? 'Admin Dashboard' : 'My Messages'}
       </MenuItem>
       <Divider />
       <MenuItem onClick={handleLogout}>
@@ -398,6 +412,21 @@ const Navbar = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               {isAuthenticated ? (
                 <>
+                  <Button
+                    component={Link}
+                    to={user?.role === 'admin' ? '/admin' : '/user/dashboard'}
+                    variant="outlined"
+                    sx={{
+                      color: "white",
+                      borderColor: "rgba(255, 255, 255, 0.3)",
+                      "&:hover": {
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        borderColor: "rgba(255, 255, 255, 0.5)",
+                      },
+                    }}
+                  >
+                    {user?.role === 'admin' ? 'Admin Panel' : 'My Messages'}
+                  </Button>
                   <IconButton
                     onClick={handleProfileMenuOpen}
                     sx={{

@@ -30,7 +30,10 @@ import {
   List,
   ListItem,
   ListItemText,
-  Divider
+  Divider,
+  CircularProgress,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -48,12 +51,81 @@ import {
   DesignServices as DesignIcon,
   LocalShipping as ShippingIcon,
   Assignment as AssignmentIcon,
-  Chat as ChatIcon
+  Chat as ChatIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
-// Mock data for orders, gallery services, and contact messages
+// API service for contact messages
+const contactService = {
+  // Get all contact messages
+  getMessages: async (page = 1, limit = 50, status = '') => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (status) params.append('status', status);
+    
+    const response = await fetch(`http://localhost:5000/api/contact?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return await response.json();
+  },
+
+  // Get single message
+  getMessage: async (id) => {
+    const response = await fetch(`http://localhost:5000/api/contact/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return await response.json();
+  },
+
+  // Update message status
+  updateStatus: async (id, status) => {
+    const response = await fetch(`http://localhost:5000/api/contact/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status })
+    });
+    return await response.json();
+  },
+
+  // Reply to message
+  sendReply: async (id, replyMessage) => {
+    const response = await fetch(`http://localhost:5000/api/contact/${id}/reply`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ replyMessage })
+    });
+    return await response.json();
+  },
+
+  // Delete message
+  deleteMessage: async (id) => {
+    const response = await fetch(`http://localhost:5000/api/contact/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return await response.json();
+  }
+};
+
+// Mock data for orders and gallery services (keep existing)
 const mockOrders = [
   {
     id: 'ORD-001',
@@ -84,21 +156,6 @@ const mockOrders = [
     files: ['wedding_shotlist.pdf'],
     specialInstructions: 'Outdoor ceremony at garden',
     address: '456 Oak Ave, City, State'
-  },
-  {
-    id: 'ORD-003',
-    customer: 'Mike Johnson',
-    email: 'mike@example.com',
-    phone: '+1234567892',
-    serviceType: 'design',
-    serviceDetails: 'Logo Design',
-    quantity: 1,
-    totalAmount: 200.00,
-    status: 'completed',
-    date: '2024-01-13',
-    files: ['brand_guidelines.pdf'],
-    specialInstructions: 'Modern and minimalist design',
-    address: '789 Pine Rd, City, State'
   }
 ];
 
@@ -114,43 +171,6 @@ const mockGalleryServices = [
     uploadDate: '2024-01-10',
     downloads: 15,
     orders: 8
-  },
-  {
-    id: 2,
-    title: 'Mountain Majesty',
-    category: 'Landscape',
-    description: 'Breathtaking mountain view during golden hour with perfect lighting.',
-    photographer: 'Jane Smith',
-    price: 59.99,
-    status: 'active',
-    uploadDate: '2024-01-09',
-    downloads: 23,
-    orders: 12
-  }
-];
-
-const mockContactMessages = [
-  {
-    id: 1,
-    name: 'Robert Taylor',
-    email: 'robert@example.com',
-    phone: '+1234567894',
-    subject: 'Wedding Photography Inquiry',
-    message: 'I would like to inquire about your wedding photography packages for my wedding in June.',
-    date: '2024-01-15 14:30',
-    status: 'unread',
-    replied: false
-  },
-  {
-    id: 2,
-    name: 'Emily Davis',
-    email: 'emily@example.com',
-    phone: '+1234567895',
-    subject: 'Custom Print Order',
-    message: 'Can you create custom prints for my art exhibition? I need large format prints.',
-    date: '2024-01-14 11:15',
-    status: 'read',
-    replied: true
   }
 ];
 
@@ -174,13 +194,22 @@ const AdminDashboardContent = () => {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
-    // Load mock data
+    loadInitialData();
+  }, []);
+
+  const loadInitialData = async () => {
+    // Load mock data for orders and gallery
     setOrders(mockOrders);
     setGalleryServices(mockGalleryServices);
-    setContactMessages(mockContactMessages);
+    
+    // Load real contact messages
+    await loadContactMessages();
     
     // Calculate stats
     setStats({
@@ -189,12 +218,42 @@ const AdminDashboardContent = () => {
       revenue: mockOrders.reduce((sum, order) => sum + order.totalAmount, 0),
       totalPhotos: mockGalleryServices.length,
       pendingOrders: mockOrders.filter(order => order.status === 'pending').length,
-      unreadMessages: mockContactMessages.filter(msg => msg.status === 'unread').length
+      unreadMessages: contactMessages.filter(msg => msg.status === 'unread').length
     });
-  }, []);
+  };
+
+  const loadContactMessages = async () => {
+    try {
+      setLoading(true);
+      const response = await contactService.getMessages();
+      
+      if (response.success) {
+        setContactMessages(response.data);
+        // Update unread messages count in stats
+        setStats(prev => ({
+          ...prev,
+          unreadMessages: response.stats.unread
+        }));
+      } else {
+        showSnackbar('Failed to load messages', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to load contact messages:', error);
+      showSnackbar('Failed to load messages', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
+    if (newValue === 2) { // Contact messages tab
+      loadContactMessages();
+    }
   };
 
   const handleOrderStatusChange = (orderId, newStatus) => {
@@ -208,29 +267,82 @@ const AdminDashboardContent = () => {
     setOrderDialogOpen(true);
   };
 
-  const handleViewMessage = (message) => {
-    setSelectedMessage(message);
-    // Mark as read
-    setContactMessages(prev => prev.map(msg => 
-      msg.id === message.id ? { ...msg, status: 'read' } : msg
-    ));
+  const handleViewMessage = async (message) => {
+    try {
+      // If message is unread, mark it as read
+      if (message.status === 'unread') {
+        const response = await contactService.updateStatus(message._id, 'read');
+        if (response.success) {
+          await loadContactMessages(); // Reload to update the list
+        }
+      }
+      
+      setSelectedMessage(message);
+      setMessageDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to view message:', error);
+      showSnackbar('Failed to load message details', 'error');
+    }
   };
 
   const handleReply = (message) => {
     setSelectedMessage(message);
+    setReplyText('');
     setReplyDialogOpen(true);
   };
 
-  const handleSendReply = () => {
-    if (selectedMessage && replyText.trim()) {
-      // Mark as replied
-      setContactMessages(prev => prev.map(msg => 
-        msg.id === selectedMessage.id ? { ...msg, replied: true } : msg
-      ));
-      setReplyDialogOpen(false);
-      setReplyText('');
-      // Here you would typically send the email
-      console.log('Sending reply:', { to: selectedMessage.email, message: replyText });
+  const handleSendReply = async () => {
+    if (!selectedMessage || !replyText.trim()) {
+      showSnackbar('Please enter a reply message', 'error');
+      return;
+    }
+
+    try {
+      const response = await contactService.sendReply(selectedMessage._id, replyText);
+      
+      if (response.success) {
+        showSnackbar('Reply sent successfully!');
+        setReplyDialogOpen(false);
+        setReplyText('');
+        await loadContactMessages(); // Reload messages
+      } else {
+        showSnackbar(response.message || 'Failed to send reply', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to send reply:', error);
+      showSnackbar('Failed to send reply', 'error');
+    }
+  };
+
+  const handleMarkAsRead = async (messageId) => {
+    try {
+      const response = await contactService.updateStatus(messageId, 'read');
+      if (response.success) {
+        showSnackbar('Message marked as read');
+        await loadContactMessages();
+      } else {
+        showSnackbar('Failed to update message', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+      showSnackbar('Failed to update message', 'error');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      try {
+        const response = await contactService.deleteMessage(messageId);
+        if (response.success) {
+          showSnackbar('Message deleted successfully');
+          await loadContactMessages();
+        } else {
+          showSnackbar('Failed to delete message', 'error');
+        }
+      } catch (error) {
+        console.error('Failed to delete message:', error);
+        showSnackbar('Failed to delete message', 'error');
+      }
     }
   };
 
@@ -239,6 +351,7 @@ const AdminDashboardContent = () => {
       case 'completed':
       case 'active':
       case 'read':
+      case 'replied':
         return 'success';
       case 'in-progress':
         return 'warning';
@@ -265,6 +378,16 @@ const AdminDashboardContent = () => {
       default:
         return <AssignmentIcon />;
     }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const StatCard = ({ icon, title, value, color, subtitle }) => (
@@ -461,76 +584,128 @@ const AdminDashboardContent = () => {
 
   const ContactManagementTab = () => (
     <Box>
-      <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
-        Contact Messages
-      </Typography>
-      
-      <Grid container spacing={3}>
-        {contactMessages.map((message) => (
-          <Grid item xs={12} key={message.id}>
-            <Card sx={{ 
-              borderLeft: message.status === 'unread' ? `4px solid ${theme.palette.error.main}` : '4px solid transparent'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box>
-                    <Typography variant="h6" gutterBottom>
-                      {message.subject}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      From: {message.name} • {message.email} • {message.phone}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {message.replied && (
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          Contact Messages
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            startIcon={<RefreshIcon />}
+            onClick={loadContactMessages}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Badge badgeContent={stats.unreadMessages} color="error">
+            <EmailIcon color="action" />
+          </Badge>
+        </Box>
+      </Box>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : contactMessages.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <EmailIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" color="textSecondary" gutterBottom>
+            No Messages Yet
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Contact messages from users will appear here.
+          </Typography>
+        </Paper>
+      ) : (
+        <Grid container spacing={3}>
+          {contactMessages.map((message) => (
+            <Grid item xs={12} key={message._id}>
+              <Card sx={{ 
+                borderLeft: message.status === 'unread' ? `4px solid ${theme.palette.error.main}` : '4px solid transparent',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  boxShadow: theme.shadows[4],
+                  transform: 'translateY(-2px)'
+                }
+              }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" gutterBottom>
+                        {message.subject || 'General Inquiry'}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" gutterBottom>
+                        From: {message.name} • {message.email} • {message.phone || 'No phone provided'}
+                      </Typography>
+                      <Typography variant="body2" sx={{ 
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {message.message}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 2 }}>
+                      {message.replied && (
+                        <Chip 
+                          label="Replied" 
+                          size="small" 
+                          color="success" 
+                          variant="outlined"
+                        />
+                      )}
                       <Chip 
-                        label="Replied" 
+                        label={message.status} 
                         size="small" 
-                        color="success" 
-                        variant="outlined"
+                        color={getStatusColor(message.status)}
                       />
-                    )}
-                    <Typography variant="caption" color="textSecondary">
-                      {new Date(message.date).toLocaleString()}
-                    </Typography>
+                      <Typography variant="caption" color="textSecondary" sx={{ minWidth: 120, textAlign: 'right' }}>
+                        {formatDate(message.createdAt)}
+                      </Typography>
+                    </Box>
                   </Box>
-                </Box>
-                
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  {message.message}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Button
-                    size="small"
-                    startIcon={<ViewIcon />}
-                    onClick={() => handleViewMessage(message)}
-                  >
-                    View Details
-                  </Button>
-                  <Button
-                    size="small"
-                    startIcon={<ReplyIcon />}
-                    variant="outlined"
-                    onClick={() => handleReply(message)}
-                  >
-                    Reply
-                  </Button>
-                  {message.status === 'unread' && (
+                  
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Button
                       size="small"
-                      variant="text"
+                      startIcon={<ViewIcon />}
                       onClick={() => handleViewMessage(message)}
                     >
-                      Mark as Read
+                      View Details
                     </Button>
-                  )}
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+                    <Button
+                      size="small"
+                      startIcon={<ReplyIcon />}
+                      variant="outlined"
+                      onClick={() => handleReply(message)}
+                    >
+                      Reply
+                    </Button>
+                    {message.status === 'unread' && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        onClick={() => handleMarkAsRead(message._id)}
+                      >
+                        Mark as Read
+                      </Button>
+                    )}
+                    <Button
+                      size="small"
+                      color="error"
+                      variant="text"
+                      onClick={() => handleDeleteMessage(message._id)}
+                    >
+                      Delete
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
     </Box>
   );
 
@@ -723,6 +898,105 @@ const AdminDashboardContent = () => {
         </DialogActions>
       </Dialog>
 
+      {/* Message Details Dialog */}
+      <Dialog 
+        open={messageDialogOpen} 
+        onClose={() => setMessageDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Message from {selectedMessage?.name}
+        </DialogTitle>
+        <DialogContent>
+          {selectedMessage && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>Contact Information</Typography>
+                <List dense>
+                  <ListItem>
+                    <ListItemText primary="Name" secondary={selectedMessage.name} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Email" secondary={selectedMessage.email} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Phone" secondary={selectedMessage.phone || 'Not provided'} />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Date" secondary={formatDate(selectedMessage.createdAt)} />
+                  </ListItem>
+                </List>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="h6" gutterBottom>Message Status</Typography>
+                <List dense>
+                  <ListItem>
+                    <ListItemText primary="Status" secondary={
+                      <Chip 
+                        label={selectedMessage.status} 
+                        size="small" 
+                        color={getStatusColor(selectedMessage.status)}
+                      />
+                    } />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText primary="Replied" secondary={
+                      <Chip 
+                        label={selectedMessage.replied ? 'Yes' : 'No'} 
+                        size="small" 
+                        color={selectedMessage.replied ? 'success' : 'default'}
+                      />
+                    } />
+                  </ListItem>
+                  {selectedMessage.repliedAt && (
+                    <ListItem>
+                      <ListItemText primary="Replied At" secondary={formatDate(selectedMessage.repliedAt)} />
+                    </ListItem>
+                  )}
+                </List>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>Subject</Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {selectedMessage.subject || 'General Inquiry'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="h6" gutterBottom>Message</Typography>
+                <Paper variant="outlined" sx={{ p: 2, backgroundColor: 'grey.50' }}>
+                  <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedMessage.message}
+                  </Typography>
+                </Paper>
+              </Grid>
+              {selectedMessage.adminReply && (
+                <Grid item xs={12}>
+                  <Typography variant="h6" gutterBottom>Your Reply</Typography>
+                  <Paper variant="outlined" sx={{ p: 2, backgroundColor: 'primary.50' }}>
+                    <Typography variant="body1" style={{ whiteSpace: 'pre-wrap' }}>
+                      {selectedMessage.adminReply}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMessageDialogOpen(false)}>Close</Button>
+          <Button 
+            variant="outlined"
+            onClick={() => {
+              setMessageDialogOpen(false);
+              handleReply(selectedMessage);
+            }}
+          >
+            Reply
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Reply Dialog */}
       <Dialog 
         open={replyDialogOpen} 
@@ -738,8 +1012,17 @@ const AdminDashboardContent = () => {
             To: {selectedMessage?.email}
           </Typography>
           <Typography variant="body2" color="textSecondary" gutterBottom>
-            Subject: {selectedMessage?.subject}
+            Subject: Re: {selectedMessage?.subject || 'General Inquiry'}
           </Typography>
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="body2" color="textSecondary" gutterBottom>
+            Original Message:
+          </Typography>
+          <Paper variant="outlined" sx={{ p: 1, mb: 2, backgroundColor: 'grey.50', maxHeight: 100, overflow: 'auto' }}>
+            <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
+              {selectedMessage?.message}
+            </Typography>
+          </Paper>
           <TextField
             autoFocus
             multiline
@@ -749,7 +1032,7 @@ const AdminDashboardContent = () => {
             label="Your reply"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            sx={{ mt: 2 }}
+            placeholder="Type your reply message here..."
           />
         </DialogContent>
         <DialogActions>
@@ -763,6 +1046,21 @@ const AdminDashboardContent = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          severity={snackbar.severity} 
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

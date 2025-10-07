@@ -6,83 +6,169 @@ import generateToken from '../utils/generateToken.js';
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = asyncHandler(async (req, res) => {
+  console.log('📥 Register request received:', req.body);
+
   const { name, email, phone, password } = req.body;
 
-  console.log('📥 Register request received:', { name, email, phone });
+  try {
+    // Basic validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please fill in all required fields (name, email, password)'
+      });
+    }
 
-  // Validation
-  if (!name || !email || !password) {
-    res.status(400);
-    throw new Error('Please fill in all required fields');
-  }
+    // Email validation
+    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      });
+    }
 
-  if (password.length < 6) {
-    res.status(400);
-    throw new Error('Password must be at least 6 characters');
-  }
+    // Password length validation
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
 
-  // Check if user exists
-  const userExists = await User.findOne({ email });
+    // Check if user already exists
+    const userExists = await User.findOne({ email: email.toLowerCase() });
+    
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email address'
+      });
+    }
 
-  if (userExists) {
-    res.status(400);
-    throw new Error('User already exists with this email');
-  }
+    // Create new user
+    const user = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      phone: phone ? phone.trim() : '',
+      password: password,
+      role: 'user'
+    });
 
-  // Create user
-  const user = await User.create({
-    name,
-    email,
-    phone: phone || '',
-    password,
-    role: 'user'
-  });
-
-  if (user) {
+    // Generate JWT token
     const token = generateToken(user._id);
 
-    console.log('✅ User registered successfully:', user.email);
+    // Get user without password
+    const userResponse = await User.findById(user._id).select('-password');
 
-    // Return user data matching frontend expectation
+    console.log('✅ User registered successfully:', userResponse.email);
+
+    // Send success response
     res.status(201).json({
       success: true,
+      message: 'User registered successfully',
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        createdAt: user.createdAt
+        id: userResponse._id,
+        name: userResponse.name,
+        email: userResponse.email,
+        phone: userResponse.phone,
+        role: userResponse.role,
+        createdAt: userResponse.createdAt
       },
-      token
+      token: token
     });
-  } else {
-    res.status(400);
-    throw new Error('Invalid user data');
+
+  } catch (error) {
+    console.error('🔴 REGISTRATION ERROR DETAILS:');
+    console.error('Error:', error);
+    console.error('Error Name:', error.name);
+    console.error('Error Code:', error.code);
+    console.error('Error Message:', error.message);
+    
+    // Handle specific MongoDB errors
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'User already exists with this email address'
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: errors.join(', ')
+      });
+    }
+    
+    // Generic error
+    res.status(500).json({
+      success: false,
+      message: 'Registration failed. Please try again.'
+    });
   }
 });
 
-// @desc    Authenticate a user
+// @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  console.log('📥 Login request received:', { email });
+  console.log('📥 Login request received:', email);
 
-  // Validation
-  if (!email || !password) {
-    res.status(400);
-    throw new Error('Please add email and password');
+  try {
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password'
+      });
+    }
+
+    // Check if user exists and include password
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (user && (await user.matchPassword(password))) {
+      const token = generateToken(user._id);
+
+      console.log('✅ User logged in successfully:', user.email);
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          createdAt: user.createdAt
+        },
+        token: token
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+  } catch (error) {
+    console.error('🔴 LOGIN ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Login failed. Please try again.'
+    });
   }
+});
 
-  // Check for user and include password for verification
-  const user = await User.findOne({ email }).select('+password');
-
-  if (user && (await user.matchPassword(password))) {
-    const token = generateToken(user._id);
-
-    console.log('✅ User logged in successfully:', user.email);
+// @desc    Get current user
+// @route   GET /api/auth/me
+// @access  Private
+const getMe = asyncHandler(async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
 
     res.json({
       success: true,
@@ -93,32 +179,15 @@ const loginUser = asyncHandler(async (req, res) => {
         phone: user.phone,
         role: user.role,
         createdAt: user.createdAt
-      },
-      token
+      }
     });
-  } else {
-    res.status(401);
-    throw new Error('Invalid email or password');
+  } catch (error) {
+    console.error('🔴 GET ME ERROR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get user data'
+    });
   }
-});
-
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
-
-  res.json({
-    success: true,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      createdAt: user.createdAt
-    }
-  });
 });
 
 export { registerUser, loginUser, getMe };

@@ -105,44 +105,54 @@ const Register = () => {
     return null;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    console.log('🔵 [Register] Form submission started');
+  console.log('🔵 [Register] Starting form submission...');
 
-    const validationError = validateForm();
-    if (validationError) {
-      console.log('🔴 [Register] Validation failed:', validationError);
-      setError(validationError);
-      setLoading(false);
-      return;
-    }
+  // Client-side validation
+  const validationError = validateForm();
+  if (validationError) {
+    console.log('🔴 [Register] Client validation failed:', validationError);
+    setError(validationError);
+    setLoading(false);
+    return;
+  }
 
-    const { confirmPassword, ...registerData } = formData;
+  const { confirmPassword, ...registerData } = formData;
+  
+  console.log('🟡 [Register] Sending data to backend:', registerData);
+
+  try {
+    const result = await register(registerData);
     
-    console.log('🟡 [Register] Calling register function with:', registerData);
+    console.log('🟡 [Register] Backend response:', result);
     
-    try {
-      const result = await register(registerData);
+    if (result.success) {
+      console.log('🟢 [Register] SUCCESS! User registered and logged in.');
+      console.log('🟢 [Register] User data:', result.user);
       
-      console.log('🟡 [Register] Register function returned:', result);
+      // Show success message
+      setError(''); // Clear any errors
       
-      if (result.success) {
-        console.log('🟢 [Register] Registration successful, navigating to home');
+      // Redirect to home page
+      setTimeout(() => {
         navigate('/');
-      } else {
-        console.log('🔴 [Register] Registration failed:', result.error);
-        setError(result.error);
-      }
-    } catch (error) {
-      console.error('🔴 [Register] Unexpected error:', error);
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+      }, 1000);
+      
+    } else {
+      console.log('🔴 [Register] Registration failed:', result.error);
+      setError(result.error || 'Registration failed. Please try again.');
     }
-  };
+  } catch (error) {
+    console.error('🔴 [Register] Unexpected error:', error);
+    setError('An unexpected error occurred. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Test backend connection
   const testBackend = async () => {

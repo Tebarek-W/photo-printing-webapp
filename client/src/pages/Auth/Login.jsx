@@ -83,20 +83,6 @@ const Login = () => {
     setLoading(false);
   };
 
-  const fillDemoCredentials = (role) => {
-    if (role === 'admin') {
-      setFormData({
-        email: 'admin@josi.com',
-        password: 'admin123'
-      });
-    } else {
-      setFormData({
-        email: 'user@josi.com',
-        password: 'user123'
-      });
-    }
-  };
-
   return (
     <Box
       sx={{
@@ -252,55 +238,6 @@ const Login = () => {
               >
                 Sign in to your account and continue creating beautiful memories
               </Typography>
-
-              {/* Demo Credentials */}
-              <Box sx={{ mb: 4, width: '100%' }}>
-                <Typography variant="body2" color={photoTheme.text.secondary} gutterBottom align="center">
-                  Quick Access Demo Accounts:
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, mt: 1.5 }}>
-                  <Button
-                    fullWidth
-                    size="medium"
-                    variant="outlined"
-                    onClick={() => fillDemoCredentials('admin')}
-                    sx={{
-                      borderRadius: 2,
-                      borderColor: photoTheme.primary,
-                      color: photoTheme.primary,
-                      fontWeight: 600,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        transform: 'translateY(-2px)',
-                        borderColor: photoTheme.primary
-                      }
-                    }}
-                  >
-                    Admin Account
-                  </Button>
-                  <Button
-                    fullWidth
-                    size="medium"
-                    variant="outlined"
-                    onClick={() => fillDemoCredentials('user')}
-                    sx={{
-                      borderRadius: 2,
-                      borderColor: photoTheme.secondary,
-                      color: photoTheme.secondary,
-                      fontWeight: 600,
-                      transition: 'all 0.3s ease',
-                      '&:hover': {
-                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                        transform: 'translateY(-2px)',
-                        borderColor: photoTheme.secondary
-                      }
-                    }}
-                  >
-                    User Account
-                  </Button>
-                </Box>
-              </Box>
 
               <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
                 {error && (
