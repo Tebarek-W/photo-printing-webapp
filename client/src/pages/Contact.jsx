@@ -7,7 +7,6 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import SendIcon from '@mui/icons-material/Send';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
 
 // Animation variants
 const fadeInUp = {
@@ -32,10 +31,9 @@ const scaleIn = {
 
 const Contact = () => {
   const theme = useTheme();
-  const { user, isAuthenticated } = useAuth();
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
+    name: '',
+    email: '',
     phone: '',
     message: '',
   });
@@ -57,34 +55,15 @@ const Contact = () => {
     setLoading(true);
     setError('');
 
-    // Ensure we have the user data even if fields are disabled
-    const submissionData = {
-      ...formData,
-      name: user?.name || formData.name,
-      email: user?.email || formData.email
-    };
-
-    console.log('📤 Sending contact message:', submissionData);
-    console.log('🔐 User status:', isAuthenticated ? `Authenticated as ${user?.name}` : 'Guest user');
+    console.log('📤 Sending contact message:', formData);
 
     try {
-      const token = localStorage.getItem('token');
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      // Add authorization header if user is logged in
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-        console.log('🔐 Sending request with authentication token');
-      } else {
-        console.log('🔐 Sending request as guest user');
-      }
-
       const response = await fetch('http://localhost:5000/api/contact', {
         method: 'POST',
-        headers: headers,
-        body: JSON.stringify(submissionData),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
@@ -93,10 +72,10 @@ const Contact = () => {
         console.log('✅ Message sent successfully:', data);
         setIsSubmitted(true);
         
-        // Reset form but keep user data if logged in
+        // Reset form
         setFormData({
-          name: user?.name || '',
-          email: user?.email || '',
+          name: '',
+          email: '',
           phone: '',
           message: '',
         });
@@ -160,30 +139,8 @@ const Contact = () => {
               mx: 'auto'
             }}
           >
-            {isAuthenticated 
-              ? `Welcome ${user?.name}! Your messages will be saved to your account.`
-              : 'Get in touch with our team for inquiries or appointments. We\'re here to help bring your vision to life.'
-            }
+            Get in touch with our team for inquiries or appointments. We're here to help bring your vision to life.
           </Typography>
-
-          {/* Authentication Status Info */}
-          {isAuthenticated && (
-            <Paper 
-              sx={{ 
-                p: 2, 
-                mb: 3, 
-                backgroundColor: alpha(theme.palette.success.main, 0.1),
-                border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                maxWidth: 400,
-                mx: 'auto'
-              }}
-            >
-              <Typography variant="body2" color="success.main" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                <CheckCircleIcon fontSize="small" />
-                You are logged in. Your messages will be saved to your account.
-              </Typography>
-            </Paper>
-          )}
         </Box>
 
         <Grid container spacing={4}>
@@ -228,12 +185,11 @@ const Contact = () => {
                   label="Your Name"
                   variant="outlined"
                   name="name"
-                  value={user?.name || formData.name}
+                  value={formData.name}
                   onChange={handleChange}
                   required
                   fullWidth
-                  disabled={loading || !!user?.name}
-                  helperText={user?.name && "Prefilled from your account"}
+                  disabled={loading}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
@@ -248,12 +204,11 @@ const Contact = () => {
                   variant="outlined"
                   type="email"
                   name="email"
-                  value={user?.email || formData.email}
+                  value={formData.email}
                   onChange={handleChange}
                   required
                   fullWidth
-                  disabled={loading || !!user?.email}
-                  helperText={user?.email && "Prefilled from your account"}
+                  disabled={loading}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: 2,
@@ -328,25 +283,6 @@ const Contact = () => {
                 >
                   {loading ? 'Sending...' : isSubmitted ? 'Message Sent!' : 'Send Message'}
                 </Button>
-
-                {/* Authentication Notice */}
-                {!isAuthenticated && (
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
-                    💡 <strong>Tip:</strong>{' '}
-                    <Box 
-                      component="span" 
-                      sx={{ 
-                        color: theme.palette.primary.main, 
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                      onClick={() => window.location.href = '/login'}
-                    >
-                      Log in
-                    </Box>{' '}
-                    to save your messages to your account and track responses!
-                  </Typography>
-                )}
               </Box>
             </Paper>
           </Grid>
@@ -412,14 +348,35 @@ const Contact = () => {
                   </Box>
                 </Box>
 
-                {/* Message Tracking Info */}
+                {/* Social Media Links */}
                 <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                   <Typography variant="body2" sx={{ mb: 2, opacity: 0.8 }}>
-                    {isAuthenticated 
-                      ? '📬 Your messages are saved to your account. View them in "My Messages".'
-                      : '💡 Create an account to track your messages and responses!'
-                    }
+                    Follow us on social media
                   </Typography>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    {['Instagram', 'Facebook', 'Twitter'].map((platform, index) => (
+                      <Box
+                        key={index}
+                        component={motion.div}
+                        whileHover={{ scale: 1.1, y: -3 }}
+                        sx={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                          borderRadius: 2,
+                          px: 2,
+                          py: 1,
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                          }
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {platform}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
                 </Box>
               </Card>
             </Box>
@@ -446,17 +403,9 @@ const Contact = () => {
             }}
           >
             <CheckCircleIcon />
-            <Box>
-              <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                Your message has been sent successfully!
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {isAuthenticated 
-                  ? 'You can track responses in "My Messages".'
-                  : 'We\'ll get back to you soon.'
-                }
-              </Typography>
-            </Box>
+            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+              Your message has been sent successfully! We'll get back to you soon.
+            </Typography>
           </Box>
         </Fade>
       </Container>

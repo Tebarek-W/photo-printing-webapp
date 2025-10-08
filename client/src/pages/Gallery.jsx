@@ -10,7 +10,12 @@ import {
   Chip,
   Button,
   Snackbar,
-  Alert
+  Alert,
+  Grid,
+  TextField,
+  MenuItem,
+  Pagination,
+  CircularProgress
 } from '@mui/material';
 import {
   Close,
@@ -20,144 +25,86 @@ import {
   FullscreenExit,
   ZoomIn,
   Print,
-  AddShoppingCart
+  AddShoppingCart,
+  Search,
+  Refresh
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-// Sample photography images from Unsplash
-const galleryImages = [
-  {
-    id: 1,
-    img: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30',
-    title: 'Urban Landscape',
-    category: 'Urban',
-    description: 'Stunning cityscape photography capturing the essence of modern architecture.',
-    photographer: 'John Doe',
-    price: 49.99
-  },
-  {
-    id: 2,
-    img: 'https://images.unsplash.com/icon-1504198453319-5ce911bafcde',
-    title: 'Mountain Majesty',
-    category: 'Landscape',
-    description: 'Breathtaking mountain view during golden hour with perfect lighting.',
-    photographer: 'Jane Smith',
-    price: 59.99
-  },
-  {
-    id: 3,
-    img: 'https://images.unsplash.com/icon-1554080353-a576cf803bda',
-    title: 'Natural Portrait',
-    category: 'Portrait',
-    description: 'Authentic portrait photography with natural lighting and emotional depth.',
-    photographer: 'Alex Johnson',
-    price: 39.99
-  },
-  {
-    id: 4,
-    img: 'https://images.unsplash.com/icon-1502082553048-f009c37129b9',
-    title: 'Forest Pathway',
-    category: 'Nature',
-    description: 'Serene forest pathway captured with beautiful bokeh effect.',
-    photographer: 'Michael Brown',
-    price: 45.99
-  },
-  {
-    id: 5,
-    img: 'https://images.unsplash.com/icon-1516483638261-f4dbaf036963',
-    title: 'Italian Architecture',
-    category: 'Architecture',
-    description: 'Historic Italian architecture photographed with perfect symmetry.',
-    photographer: 'Sarah Williams',
-    price: 54.99
-  },
-  {
-    id: 6,
-    img: 'https://images.unsplash.com/icon-1526662092590-e314cbeaf8da',
-    title: 'Professional Headshot',
-    category: 'Portrait',
-    description: 'Corporate headshot with professional lighting and composition.',
-    photographer: 'David Wilson',
-    price: 42.99
-  },
-  {
-    id: 7,
-    img: 'https://images.unsplash.com/icon-1472214103451-9374bd1c798e',
-    title: 'Coastal Cliffs',
-    category: 'Landscape',
-    description: 'Dramatic coastal cliffs with crashing waves and golden sunset.',
-    photographer: 'Emily Davis',
-    price: 62.99
-  },
-  {
-    id: 8,
-    img: 'https://images.unsplash.com/icon-1433086966358-54859d0ed716',
-    title: 'Forest Waterfall',
-    category: 'Nature',
-    description: 'Majestic waterfall in the forest with long exposure technique.',
-    photographer: 'Robert Miller',
-    price: 57.99
-  },
-  {
-    id: 9,
-    img: 'https://images.unsplash.com/icon-1501594907352-04cda38ebc29',
-    title: 'Wine Photography',
-    category: 'Product',
-    description: 'Elegant product photography for premium wine branding.',
-    photographer: 'Jessica Taylor',
-    price: 47.99
-  },
-  {
-    id: 10,
-    img: 'https://images.unsplash.com/icon-1518837695005-2083093ee35b',
-    title: 'Musical Atmosphere',
-    category: 'Event',
-    description: 'Live music event photography capturing the energy and emotion.',
-    photographer: 'Thomas Anderson',
-    price: 52.99
-  },
-  {
-    id: 11,
-    img: 'https://images.unsplash.com/icon-1418065460487-3e41a6c84dc5',
-    title: 'Mountain Cabin',
-    category: 'Landscape',
-    description: 'Cozy mountain cabin surrounded by autumn foliage.',
-    photographer: 'Olivia Martin',
-    price: 49.99
-  },
-  {
-    id: 12,
-    img: 'https://images.unsplash.com/icon-1470071459604-3b5ec3a7fe05',
-    title: 'Misty Landscape',
-    category: 'Nature',
-    description: 'Atmospheric misty landscape with dramatic lighting.',
-    photographer: 'Christopher Lee',
-    price: 55.99
-  }
-];
-
 const Gallery = () => {
+  const [galleryItems, setGalleryItems] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [loadedImages, setLoadedImages] = useState({});
   const [activeCategory, setActiveCategory] = useState('All');
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categories, setCategories] = useState(['All']);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0
+  });
+  const [stats, setStats] = useState({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
   const navigate = useNavigate();
 
-  // Get unique categories
-  const categories = ['All', ...new Set(galleryImages.map(image => image.category))];
+  // Load gallery items
+  const loadGalleryItems = async (page = 1, category = activeCategory, search = searchTerm) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('limit', 12);
+      if (category !== 'All') params.append('category', category);
+      if (search) params.append('search', search);
 
-  // Filter images by category
-  const filteredImages = activeCategory === 'All' 
-    ? galleryImages 
-    : galleryImages.filter(image => image.category === activeCategory);
+      const response = await fetch(`http://localhost:5000/api/gallery?${params.toString()}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setGalleryItems(data.data);
+        setPagination(data.pagination);
+        setCategories(data.categories);
+        setStats(data.stats);
+      } else {
+        setError(data.message || 'Failed to load gallery items');
+      }
+    } catch (error) {
+      console.error('Failed to load gallery items:', error);
+      setError('Failed to load gallery items. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load categories
+  const loadCategories = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/gallery/categories');
+      const data = await response.json();
+      
+      if (data.success) {
+        setCategories(data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadGalleryItems();
+    loadCategories();
+  }, []);
 
   // Calculate column count based on screen size
   const getColumnCount = () => {
@@ -167,9 +114,9 @@ const Gallery = () => {
   };
 
   // Handle image selection
-  const handleImageClick = (image, index) => {
-    setSelectedImage(image);
-    setCurrentIndex(galleryImages.findIndex(img => img.id === image.id));
+  const handleImageClick = (item, index) => {
+    setSelectedImage(item);
+    setCurrentIndex(galleryItems.findIndex(img => img._id === item._id));
   };
 
   // Handle modal close
@@ -180,25 +127,22 @@ const Gallery = () => {
 
   // Navigate to next image
   const handleNext = useCallback(() => {
-    const nextIndex = (currentIndex + 1) % galleryImages.length;
+    const nextIndex = (currentIndex + 1) % galleryItems.length;
     setCurrentIndex(nextIndex);
-    setSelectedImage(galleryImages[nextIndex]);
-  }, [currentIndex]);
+    setSelectedImage(galleryItems[nextIndex]);
+  }, [currentIndex, galleryItems]);
 
   // Navigate to previous image
   const handlePrev = useCallback(() => {
-    const prevIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length;
+    const prevIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
     setCurrentIndex(prevIndex);
-    setSelectedImage(galleryImages[prevIndex]);
-  }, [currentIndex]);
+    setSelectedImage(galleryItems[prevIndex]);
+  }, [currentIndex, galleryItems]);
 
   // Handle redirect to order page
   const handleOrderRedirect = () => {
     if (selectedImage) {
-      // Close the modal first
       handleCloseModal();
-      
-      // Navigate to order page with the selected image as state
       navigate('/order', { 
         state: { 
           selectedImage: selectedImage,
@@ -206,6 +150,24 @@ const Gallery = () => {
         } 
       });
     }
+  };
+
+  // Handle category change
+  const handleCategoryChange = (category) => {
+    setActiveCategory(category);
+    loadGalleryItems(1, category, searchTerm);
+  };
+
+  // Handle search
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+    loadGalleryItems(1, activeCategory, value);
+  };
+
+  // Handle page change
+  const handlePageChange = (event, page) => {
+    loadGalleryItems(page, activeCategory, searchTerm);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Keyboard navigation
@@ -258,6 +220,11 @@ const Gallery = () => {
     setLoadedImages(prev => ({ ...prev, [id]: true }));
   };
 
+  // Show snackbar
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
       <Box sx={{ textAlign: 'center', mb: 6 }}>
@@ -286,146 +253,240 @@ const Gallery = () => {
             mx: 'auto'
           }}
         >
-          Explore our professional photography work. Click any image to view details and order prints.
+          Explore our professional photography work. {stats.total} stunning images available.
         </Typography>
 
-        {/* Category Filters */}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 1, mb: 4 }}>
-          {categories.map(category => (
-            <Chip
-              key={category}
-              label={category}
-              onClick={() => setActiveCategory(category)}
-              color={activeCategory === category ? 'primary' : 'default'}
-              variant={activeCategory === category ? 'filled' : 'outlined'}
-              sx={{ 
-                mb: 1,
-                fontWeight: 600,
-                '&:hover': {
-                  transform: 'translateY(-2px)',
+        {/* Search and Filter Bar */}
+        <Box sx={{ display: 'flex', gap: 2, mb: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+          <TextField
+            placeholder="Search images..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value)}
+            InputProps={{
+              startAdornment: <Search sx={{ color: 'text.secondary', mr: 1 }} />
+            }}
+            sx={{ minWidth: 250 }}
+            size="small"
+          />
+          
+          <TextField
+            select
+            value={activeCategory}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            size="small"
+            sx={{ minWidth: 150 }}
+          >
+            {categories.map(category => (
+              <MenuItem key={category} value={category}>
+                {category}
+              </MenuItem>
+            ))}
+          </TextField>
 
-                  boxShadow: 2
-                },
-                transition: 'all 0.2s ease'
-              }}
+          <Button
+            startIcon={<Refresh />}
+            onClick={() => loadGalleryItems()}
+            variant="outlined"
+            size="small"
+          >
+            Refresh
+          </Button>
+        </Box>
+
+        {/* Stats */}
+        <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap', mb: 3 }}>
+          <Chip 
+            label={`${stats.total || 0} Total Images`} 
+            variant="outlined" 
+            color="primary" 
+          />
+          <Chip 
+            label={`${stats.featured || 0} Featured`} 
+            variant="outlined" 
+            color="secondary" 
+          />
+          {stats.byCategory?.map(stat => (
+            <Chip 
+              key={stat._id}
+              label={`${stat.count} ${stat._id}`} 
+              variant="outlined"
+              size="small"
             />
           ))}
         </Box>
       </Box>
 
-      {/* Masonry Grid */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${getColumnCount()}, 1fr)`,
-          gap: 2,
-          mb: 4
-        }}
-      >
-        {filteredImages.map((item, index) => (
-          <motion.div
-            key={item.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            whileHover={{ y: -5 }}
-          >
-            <Box
-              sx={{
-                position: 'relative',
-                overflow: 'hidden',
-                borderRadius: 2,
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                '&:hover .gallery-image': {
-                  transform: 'scale(1.05)'
-                },
-                '&:hover .image-overlay': {
-                  opacity: 1
-                }
-              }}
-              onClick={() => handleImageClick(item, index)}
-            >
-              {!loadedImages[item.id] && (
-                <Skeleton 
-                  variant="rectangular" 
-                  width="100%" 
-                  height={Math.floor(Math.random() * 100) + 200} 
-                  sx={{ borderRadius: 2 }}
-                />
-              )}
-              <Box
-                component="img"
-                className="gallery-image"
-                src={`${item.img}?auto=format&fit=crop&w=500`}
-                alt={item.title}
-                loading="lazy"
-                onLoad={() => handleImageLoad(item.id)}
-                sx={{
-                  width: '100%',
-                  height: 'auto',
-                  display: loadedImages[item.id] ? 'block' : 'none',
-                  transition: 'transform 0.5s ease',
-                  borderRadius: 2
-                }}
-              />
-              <Box
-                className="image-overlay"
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 70%)',
-                  opacity: 0,
-                  transition: 'opacity 0.3s ease',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'flex-end',
-                  p: 2,
-                  color: 'white'
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
-                  {item.title}
-                </Typography>
-                <Chip 
-                  label={item.category} 
-                  size="small" 
-                  sx={{ 
-                    backgroundColor: 'primary.main',
-                    color: 'white',
-                    fontSize: '0.7rem',
-                    height: 24
-                  }} 
-                />
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <ZoomIn sx={{ fontSize: 16, mr: 0.5 }} />
-                  <Typography variant="caption">Click to view & order</Typography>
-                </Box>
-              </Box>
-            </Box>
-          </motion.div>
-        ))}
-      </Box>
-
-      {/* Empty state if no images in category */}
-      {filteredImages.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <Typography variant="h5" gutterBottom>
-            No images in this category yet
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Check back soon for new additions to our {activeCategory} portfolio
-          </Typography>
-          <Button 
-            variant="contained" 
-            onClick={() => setActiveCategory('All')}
-          >
-            View All Photos
-          </Button>
+      {/* Loading State */}
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress size={40} />
         </Box>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Gallery Grid */}
+      {!loading && !error && (
+        <>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${getColumnCount()}, 1fr)`,
+              gap: 2,
+              mb: 4
+            }}
+          >
+            {galleryItems.map((item, index) => (
+              <motion.div
+                key={item._id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -5 }}
+              >
+                <Box
+                  sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: 2,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    '&:hover .gallery-image': {
+                      transform: 'scale(1.05)'
+                    },
+                    '&:hover .image-overlay': {
+                      opacity: 1
+                    }
+                  }}
+                  onClick={() => handleImageClick(item, index)}
+                >
+                  {!loadedImages[item._id] && (
+                    <Skeleton 
+                      variant="rectangular" 
+                      width="100%" 
+                      height={Math.floor(Math.random() * 100) + 200} 
+                      sx={{ borderRadius: 2 }}
+                    />
+                  )}
+                  <Box
+                    component="img"
+                    className="gallery-image"
+                    src={item.imageUrl}
+                    alt={item.title}
+                    loading="lazy"
+                    onLoad={() => handleImageLoad(item._id)}
+                    sx={{
+                      width: '100%',
+                      height: 'auto',
+                      display: loadedImages[item._id] ? 'block' : 'none',
+                      transition: 'transform 0.5s ease',
+                      borderRadius: 2
+                    }}
+                  />
+                  <Box
+                    className="image-overlay"
+                    sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 70%)',
+                      opacity: 0,
+                      transition: 'opacity 0.3s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'flex-end',
+                      p: 2,
+                      color: 'white'
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+                      {item.title}
+                    </Typography>
+                    <Chip 
+                      label={item.category} 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: 'primary.main',
+                        color: 'white',
+                        fontSize: '0.7rem',
+                        height: 24,
+                        mb: 1
+                      }} 
+                    />
+                    {item.featured && (
+                      <Chip 
+                        label="Featured" 
+                        size="small" 
+                        sx={{ 
+                          backgroundColor: 'secondary.main',
+                          color: 'white',
+                          fontSize: '0.7rem',
+                          height: 20
+                        }} 
+                      />
+                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, justifyContent: 'space-between' }}>
+                      <Typography variant="caption">
+                        ${item.pricing?.digital || 0}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <ZoomIn sx={{ fontSize: 16, mr: 0.5 }} />
+                        <Typography variant="caption">View & Order</Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Box>
+              </motion.div>
+            ))}
+          </Box>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Pagination
+                count={pagination.totalPages}
+                page={pagination.currentPage}
+                onChange={handlePageChange}
+                color="primary"
+                size={isMobile ? "small" : "medium"}
+              />
+            </Box>
+          )}
+
+          {/* Empty state */}
+          {galleryItems.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 8 }}>
+              <Typography variant="h5" gutterBottom>
+                No images found
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+                {searchTerm || activeCategory !== 'All' 
+                  ? 'Try adjusting your search or filters'
+                  : 'No images available in the gallery yet'
+                }
+              </Typography>
+              {(searchTerm || activeCategory !== 'All') && (
+                <Button 
+                  variant="contained" 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setActiveCategory('All');
+                    loadGalleryItems(1, 'All', '');
+                  }}
+                >
+                  View All Photos
+                </Button>
+              )}
+            </Box>
+          )}
+        </>
       )}
 
       {/* Image Modal */}
@@ -563,7 +624,7 @@ const Gallery = () => {
               >
                 <Box
                   component="img"
-                  src={`${selectedImage.img}?auto=format&fit=crop&w=1200`}
+                  src={selectedImage.imageUrl}
                   alt={selectedImage.title}
                   sx={{
                     maxHeight: '90vh',
@@ -595,6 +656,35 @@ const Gallery = () => {
                 <Typography variant="body2" sx={{ opacity: 0.9, mb: 1 }}>
                   {selectedImage.description}
                 </Typography>
+                
+                {/* Specifications */}
+                {selectedImage.specifications && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+                    {selectedImage.specifications.camera && (
+                      <Chip 
+                        label={selectedImage.specifications.camera} 
+                        size="small"
+                        sx={{ color: 'white', backgroundColor: 'rgba(255,255,255,0.2)' }} 
+                      />
+                    )}
+                    {selectedImage.specifications.lens && (
+                      <Chip 
+                        label={selectedImage.specifications.lens} 
+                        size="small"
+                        sx={{ color: 'white', backgroundColor: 'rgba(255,255,255,0.2)' }} 
+                      />
+                    )}
+                    {selectedImage.specifications.location && (
+                      <Chip 
+                        label={selectedImage.specifications.location} 
+                        size="small"
+                        sx={{ color: 'white', backgroundColor: 'rgba(255,255,255,0.2)' }} 
+                      />
+                    )}
+                  </Box>
+                )}
+
+                {/* Pricing and Actions */}
                 <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                   <Chip 
                     label={selectedImage.category} 
@@ -604,18 +694,23 @@ const Gallery = () => {
                     }} 
                   />
                   <Chip 
-                    label={`By ${selectedImage.photographer}`} 
-                    variant="outlined"
-                    sx={{ color: 'white' }} 
-                  />
-                  <Chip 
-                    label={`$${selectedImage.price}`} 
+                    label={`Digital: $${selectedImage.pricing?.digital || 0}`} 
                     sx={{ 
                       backgroundColor: 'success.main',
                       color: 'white'
                     }} 
                   />
+                  {selectedImage.featured && (
+                    <Chip 
+                      label="Featured" 
+                      sx={{ 
+                        backgroundColor: 'secondary.main',
+                        color: 'white'
+                      }} 
+                    />
+                  )}
                 </Box>
+                
                 <Button
                   variant="contained"
                   startIcon={<Print />}
@@ -648,7 +743,7 @@ const Gallery = () => {
                   borderRadius: 1
                 }}
               >
-                {currentIndex + 1} / {galleryImages.length}
+                {currentIndex + 1} / {galleryItems.length}
               </Typography>
 
               {/* Quick Order Tip */}
@@ -673,20 +768,18 @@ const Gallery = () => {
         )}
       </AnimatePresence>
 
-      {/* Snackbar for notifications */}
+      {/* Snackbar */}
       <Snackbar
-        open={snackbarOpen}
+        open={snackbar.open}
         autoHideDuration={4000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert 
-          onClose={() => setSnackbarOpen(false)} 
-          severity="success"
-          variant="filled"
-          sx={{ width: '100%' }}
+          severity={snackbar.severity} 
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
         >
-          {snackbarMessage}
+          {snackbar.message}
         </Alert>
       </Snackbar>
     </Container>

@@ -49,12 +49,6 @@ const contactMessageSchema = new mongoose.Schema(
     },
     repliedAt: {
       type: Date
-    },
-    // Add user reference for logged-in users
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: false // Not required for guest users
     }
   },
   {
@@ -65,7 +59,6 @@ const contactMessageSchema = new mongoose.Schema(
 // Create index for better performance
 contactMessageSchema.index({ status: 1, createdAt: -1 });
 contactMessageSchema.index({ email: 1 });
-contactMessageSchema.index({ user: 1 }); // Index for user queries
 
 const ContactMessage = mongoose.model('ContactMessage', contactMessageSchema);
 

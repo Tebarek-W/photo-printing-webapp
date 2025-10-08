@@ -3,12 +3,11 @@ import ContactMessage from '../models/ContactMessage.js';
 
 // @desc    Create a new contact message
 // @route   POST /api/contact
-// @access  Public (but can accept authenticated users)
+// @access  Public
 const createContactMessage = asyncHandler(async (req, res) => {
   const { name, email, phone, message, subject } = req.body;
 
   console.log('📥 Contact message received:', { name, email, subject });
-  console.log('🔐 User authentication:', req.user ? `Authenticated as ${req.user.id}` : 'Guest user');
 
   // Validation
   if (!name || !email || !message) {
@@ -28,8 +27,8 @@ const createContactMessage = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Include user ID if user is logged in (from Authorization header)
-    const messageData = {
+    // Create contact message
+    const contactMessage = await ContactMessage.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       phone: phone ? phone.trim() : '',
@@ -37,24 +36,9 @@ const createContactMessage = asyncHandler(async (req, res) => {
       subject: subject ? subject.trim() : 'General Inquiry',
       status: 'unread',
       replied: false
-    };
-
-    // Add user reference if user is authenticated via Authorization header
-    if (req.user && req.user.id) {
-      messageData.user = req.user.id;
-      console.log(`🔗 Linking message to user: ${req.user.id}`);
-    } else {
-      console.log('🔗 Message will be saved without user link (guest user)');
-    }
-
-    // Create contact message
-    const contactMessage = await ContactMessage.create(messageData);
-
-    console.log('✅ Contact message saved:', {
-      email: contactMessage.email,
-      user: contactMessage.user || 'No user linked',
-      id: contactMessage._id
     });
+
+    console.log('✅ Contact message saved:', contactMessage.email);
 
     res.status(201).json({
       success: true,
@@ -63,8 +47,7 @@ const createContactMessage = asyncHandler(async (req, res) => {
         id: contactMessage._id,
         name: contactMessage.name,
         email: contactMessage.email,
-        subject: contactMessage.subject,
-        user: contactMessage.user
+        subject: contactMessage.subject
       }
     });
 
@@ -102,7 +85,6 @@ const getContactMessages = asyncHandler(async (req, res) => {
 
     // Get messages with pagination
     const messages = await ContactMessage.find(filter)
-      .populate('user', 'name email') // Populate user info
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit);
@@ -147,8 +129,7 @@ const getContactMessages = asyncHandler(async (req, res) => {
 // @access  Private (Admin only)
 const getContactMessage = asyncHandler(async (req, res) => {
   try {
-    const message = await ContactMessage.findById(req.params.id)
-      .populate('user', 'name email'); // Populate user info
+    const message = await ContactMessage.findById(req.params.id);
 
     if (!message) {
       return res.status(404).json({
@@ -201,7 +182,7 @@ const updateMessageStatus = asyncHandler(async (req, res) => {
         })
       },
       { new: true, runValidators: true }
-    ).populate('user', 'name email');
+    );
 
     if (!message) {
       return res.status(404).json({
@@ -248,7 +229,7 @@ const replyToMessage = asyncHandler(async (req, res) => {
         repliedAt: new Date()
       },
       { new: true, runValidators: true }
-    ).populate('user', 'name email');
+    );
 
     if (!message) {
       return res.status(404).json({
@@ -258,7 +239,9 @@ const replyToMessage = asyncHandler(async (req, res) => {
     }
 
     console.log(`✅ Admin replied to message from ${message.email}`);
-    console.log(`🔗 Message user link: ${message.user ? message.user._id : 'No user linked'}`);
+
+    // Here you would typically send an email to the user
+    // await sendEmail(message.email, 'Reply to your inquiry', replyMessage);
 
     res.json({
       success: true,
@@ -303,162 +286,11 @@ const deleteContactMessage = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get contact messages for logged-in user
-// @route   GET /api/contact/user/messages
-// @access  Private
-const getUserMessages = asyncHandler(async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    console.log(`🟡 Fetching messages for user: ${userId}`);
-    
-    const messages = await ContactMessage.find({ user: userId })
-      .sort({ createdAt: -1 })
-      .select('-__v');
-
-    console.log(`✅ Fetched ${messages.length} messages for user: ${userId}`);
-
-    // Log message details for debugging
-    messages.forEach(msg => {
-      console.log(`📧 User Message: ${msg._id} | Replied: ${msg.replied} | AdminReply: ${msg.adminReply ? 'YES' : 'NO'}`);
-    });
-
-    res.json({
-      success: true,
-      data: messages,
-      count: messages.length
-    });
-
-  } catch (error) {
-    console.error('🔴 Get user messages error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch your messages'
-    });
-  }
-});
-
-// @desc    Debug: Check if messages are properly linked to users
-// @route   GET /api/contact/debug/user-links
-// @access  Private (Admin only)
-const debugUserMessageLinks = asyncHandler(async (req, res) => {
-  try {
-    // Get all messages with user population
-    const messages = await ContactMessage.find()
-      .populate('user', 'name email')
-      .sort({ createdAt: -1 });
-
-    const stats = {
-      total: messages.length,
-      withUser: messages.filter(m => m.user).length,
-      withoutUser: messages.filter(m => !m.user).length,
-      replied: messages.filter(m => m.replied).length,
-      repliedWithUser: messages.filter(m => m.replied && m.user).length
-    };
-
-    console.log('🔍 User Message Links Debug:');
-    console.log('📊 Stats:', stats);
-    
-    messages.forEach(msg => {
-      console.log(`📧 ${msg._id} | User: ${msg.user ? msg.user._id : 'NO USER'} | Email: ${msg.email} | Replied: ${msg.replied} | AdminReply: ${msg.adminReply ? 'YES' : 'NO'}`);
-    });
-
-    res.json({
-      success: true,
-      stats,
-      messages: messages.map(msg => ({
-        id: msg._id,
-        email: msg.email,
-        user: msg.user ? { id: msg.user._id, name: msg.user.name, email: msg.user.email } : null,
-        replied: msg.replied,
-        adminReply: msg.adminReply ? 'Present' : 'Missing',
-        createdAt: msg.createdAt
-      }))
-    });
-
-  } catch (error) {
-    console.error('🔴 Debug error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Debug failed'
-    });
-  }
-});
-
-// @desc    Debug: Check specific user's messages
-// @route   GET /api/contact/debug/user/:userId
-// @access  Private (Admin only)
-const debugUserMessages = asyncHandler(async (req, res) => {
-  try {
-    const userId = req.params.userId;
-    
-    console.log(`🔍 Debugging messages for user: ${userId}`);
-    
-    // Get messages with this user ID
-    const userMessages = await ContactMessage.find({ user: userId })
-      .sort({ createdAt: -1 });
-
-    // Get all messages to compare
-    const allMessages = await ContactMessage.find()
-      .populate('user', 'name email')
-      .sort({ createdAt: -1 });
-
-    console.log('📊 Debug Results:');
-    console.log(`User ${userId} has ${userMessages.length} messages`);
-    
-    userMessages.forEach(msg => {
-      console.log(`📧 User Message: ${msg._id} | Replied: ${msg.replied} | AdminReply: ${msg.adminReply ? 'YES' : 'NO'} | Created: ${msg.createdAt}`);
-    });
-
-    console.log('\n🔍 All messages in database:');
-    allMessages.forEach(msg => {
-      console.log(`📧 All: ${msg._id} | User: ${msg.user ? msg.user._id : 'NO USER'} | Email: ${msg.email} | Replied: ${msg.replied} | AdminReply: ${msg.adminReply ? 'YES' : 'NO'}`);
-    });
-
-    res.json({
-      success: true,
-      userMessages: userMessages.map(msg => ({
-        id: msg._id,
-        email: msg.email,
-        replied: msg.replied,
-        adminReply: msg.adminReply,
-        status: msg.status,
-        createdAt: msg.createdAt,
-        repliedAt: msg.repliedAt
-      })),
-      allMessages: allMessages.map(msg => ({
-        id: msg._id,
-        email: msg.email,
-        user: msg.user ? { id: msg.user._id, name: msg.user.name } : null,
-        replied: msg.replied,
-        adminReply: msg.adminReply,
-        status: msg.status
-      })),
-      stats: {
-        userMessageCount: userMessages.length,
-        totalMessageCount: allMessages.length,
-        userRepliedCount: userMessages.filter(m => m.replied).length,
-        totalRepliedCount: allMessages.filter(m => m.replied).length
-      }
-    });
-
-  } catch (error) {
-    console.error('🔴 Debug error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Debug failed'
-    });
-  }
-});
-
-// Export all functions
 export {
   createContactMessage,
   getContactMessages,
   getContactMessage,
   updateMessageStatus,
   replyToMessage,
-  deleteContactMessage,
-  getUserMessages,
-  debugUserMessageLinks
+  deleteContactMessage
 };
