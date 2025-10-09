@@ -7,12 +7,6 @@ import {
   Grid,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Avatar,
   Chip,
   IconButton,
@@ -27,21 +21,17 @@ import {
   DialogActions,
   TextField,
   Badge,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
   CircularProgress,
   Alert,
   Snackbar,
   FormControlLabel,
-  Checkbox,
+  Switch,
   MenuItem,
   CardMedia,
   CardActions,
   Tooltip,
-  Switch,
-  alpha
+  alpha,
+  LinearProgress
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -55,23 +45,21 @@ import {
   Visibility as ViewIcon,
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
-  Print as PrintIcon,
-  DesignServices as DesignIcon,
-  LocalShipping as ShippingIcon,
-  Assignment as AssignmentIcon,
   Chat as ChatIcon,
   Refresh as RefreshIcon,
   Star as StarIcon,
   Add as AddIcon,
   Settings as SettingsIcon,
   LocalOffer as LocalOfferIcon,
-  Category as CategoryIcon
+  Category as CategoryIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
-// API service for gallery
+// API service for gallery - UPDATED WITH UPLOAD FUNCTION
 const galleryService = {
+  // Get all gallery items
   getGalleryItems: async (page = 1, limit = 50) => {
     const response = await fetch(`http://localhost:5000/api/gallery?page=${page}&limit=${limit}`, {
       headers: {
@@ -81,6 +69,22 @@ const galleryService = {
     return await response.json();
   },
 
+  // Upload image
+  uploadImage: async (file) => {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch('http://localhost:5000/api/gallery/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: formData
+    });
+    return await response.json();
+  },
+
+  // Create gallery item
   createGalleryItem: async (data) => {
     const response = await fetch('http://localhost:5000/api/gallery', {
       method: 'POST',
@@ -93,6 +97,7 @@ const galleryService = {
     return await response.json();
   },
 
+  // Update gallery item
   updateGalleryItem: async (id, data) => {
     const response = await fetch(`http://localhost:5000/api/gallery/${id}`, {
       method: 'PUT',
@@ -105,6 +110,7 @@ const galleryService = {
     return await response.json();
   },
 
+  // Delete gallery item
   deleteGalleryItem: async (id) => {
     const response = await fetch(`http://localhost:5000/api/gallery/${id}`, {
       method: 'DELETE',
@@ -116,7 +122,7 @@ const galleryService = {
   }
 };
 
-// Contact service
+// Contact service (keep your existing one)
 const contactService = {
   getMessages: async (page = 1, limit = 50, status = '') => {
     const params = new URLSearchParams();
@@ -223,7 +229,9 @@ const AdminDashboardContent = () => {
   const [galleryDialogOpen, setGalleryDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [selectedFile, setSelectedFile] = useState(null);
   
   const [galleryForm, setGalleryForm] = useState({
     title: '',
@@ -318,6 +326,54 @@ const AdminDashboardContent = () => {
     setSnackbar({ open: true, message, severity });
   };
 
+  // NEW: File upload handler
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      showSnackbar('Please select a valid image file (JPG, PNG, GIF, WebP)', 'error');
+      return;
+    }
+
+    // Validate file size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      showSnackbar('File size must be less than 10MB', 'error');
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Auto-upload when file is selected
+    handleImageUpload(file);
+  };
+
+  // NEW: Image upload function
+  const handleImageUpload = async (file) => {
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      
+      const response = await galleryService.uploadImage(file);
+
+      if (response.success) {
+        setGalleryForm({ ...galleryForm, imageUrl: response.imageUrl });
+        setSelectedFile(null);
+        showSnackbar('Image uploaded successfully!');
+      } else {
+        showSnackbar(response.message || 'Failed to upload image', 'error');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      showSnackbar('Failed to upload image', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
     if (newValue === 2) {
@@ -356,6 +412,7 @@ const AdminDashboardContent = () => {
         featured: item.featured || false,
         status: item.status || 'active'
       });
+      setSelectedFile(null);
     } else {
       setSelectedGalleryItem(null);
       setGalleryForm({
@@ -383,11 +440,17 @@ const AdminDashboardContent = () => {
         featured: false,
         status: 'active'
       });
+      setSelectedFile(null);
     }
     setGalleryDialogOpen(true);
   };
 
   const handleGallerySubmit = async () => {
+    if (!galleryForm.imageUrl) {
+      showSnackbar('Please upload an image first', 'error');
+      return;
+    }
+
     try {
       const submitData = {
         ...galleryForm,
@@ -582,7 +645,7 @@ const AdminDashboardContent = () => {
     </Card>
   );
 
-  // Enhanced Gallery Management Tab
+  // Gallery Management Tab Component
   const GalleryManagementTab = () => (
     <Box>
       <Box sx={{ 
@@ -827,7 +890,7 @@ const AdminDashboardContent = () => {
     </Box>
   );
 
-  // Enhanced Contact Management Tab
+  // Contact Management Tab
   const ContactManagementTab = () => (
     <Box>
       <Box sx={{ 
@@ -1114,7 +1177,7 @@ const AdminDashboardContent = () => {
         {activeTab === 2 && <ContactManagementTab />}
       </Box>
 
-      {/* Enhanced Gallery Item Dialog */}
+      {/* Enhanced Gallery Item Dialog with File Upload */}
       <Dialog 
         open={galleryDialogOpen} 
         onClose={() => setGalleryDialogOpen(false)} 
@@ -1157,6 +1220,105 @@ const AdminDashboardContent = () => {
         
         <DialogContent sx={{ p: 4 }}>
           <Grid container spacing={3}>
+            {/* Image Upload Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                textAlign: 'center',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  borderColor: theme.palette.primary.main,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                }
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 2, 
+                  color: theme.palette.primary.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <CloudUploadIcon fontSize="small" />
+                  Upload Image
+                </Typography>
+                
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  id="image-upload-input"
+                />
+                <label htmlFor="image-upload-input">
+                  <Button
+                    variant="contained"
+                    component="span"
+                    startIcon={<CloudUploadIcon />}
+                    disabled={uploading}
+                    sx={{
+                      borderRadius: 2,
+                      px: 4,
+                      py: 1.5,
+                      mb: 2,
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                      '&:hover': {
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.15)'
+                      }
+                    }}
+                  >
+                    {uploading ? 'Uploading...' : 'Choose Image File'}
+                  </Button>
+                </label>
+
+                {uploading && (
+                  <Box sx={{ width: '100%', mb: 2 }}>
+                    <LinearProgress />
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      Uploading image...
+                    </Typography>
+                  </Box>
+                )}
+
+                {galleryForm.imageUrl && !uploading && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: alpha(theme.palette.success.main, 0.1), borderRadius: 2 }}>
+                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+                      ✓ Image uploaded successfully!
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                      <PhotoIcon color="success" fontSize="small" />
+                      <Typography variant="caption" color="textSecondary">
+                        {galleryForm.imageUrl.split('/').pop()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                {selectedFile && !uploading && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: alpha(theme.palette.info.main, 0.1), borderRadius: 2 }}>
+                    <Typography variant="body2" color="info.main" sx={{ fontWeight: 600 }}>
+                      Selected: {selectedFile.name}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  </Box>
+                )}
+
+                {!galleryForm.imageUrl && !selectedFile && !uploading && (
+                  <Typography variant="body2" color="textSecondary">
+                    Click to select an image file (JPG, PNG, GIF, WebP - Max 10MB)
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+
             {/* Basic Information Section */}
             <Grid item xs={12}>
               <Box sx={{ 
@@ -1175,18 +1337,19 @@ const AdminDashboardContent = () => {
                   gap: 1,
                   fontWeight: 600
                 }}>
-                  <AssignmentIcon fontSize="small" />
+                  <SettingsIcon fontSize="small" />
                   Basic Information
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
                     <TextField
                       fullWidth
-                      label="Image Title"
+                      label="Image Title *"
                       value={galleryForm.title}
                       onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })}
                       variant="outlined"
                       placeholder="Enter a descriptive title for your image"
+                      required
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -1217,7 +1380,7 @@ const AdminDashboardContent = () => {
               </Box>
             </Grid>
 
-            {/* Category & Image URL Section */}
+            {/* Category Section */}
             <Grid item xs={12}>
               <Box sx={{ 
                 mb: 3, 
@@ -1236,17 +1399,18 @@ const AdminDashboardContent = () => {
                   fontWeight: 600
                 }}>
                   <CategoryIcon fontSize="small" />
-                  Category & Media
+                  Category
                 </Typography>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid item xs={12}>
                     <TextField
                       fullWidth
                       select
-                      label="Category"
+                      label="Category *"
                       value={galleryForm.category}
                       onChange={(e) => setGalleryForm({ ...galleryForm, category: e.target.value })}
                       variant="outlined"
+                      required
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -1265,22 +1429,6 @@ const AdminDashboardContent = () => {
                       <MenuItem value="Family">👨‍👩‍👧‍👦 Family</MenuItem>
                       <MenuItem value="Other">🔹 Other</MenuItem>
                     </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Image URL"
-                      value={galleryForm.imageUrl}
-                      onChange={(e) => setGalleryForm({ ...galleryForm, imageUrl: e.target.value })}
-                      variant="outlined"
-                      placeholder="https://example.com/image.jpg"
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: 2,
-                          backgroundColor: 'white'
-                        }
-                      }}
-                    />
                   </Grid>
                 </Grid>
               </Box>
@@ -1319,6 +1467,9 @@ const AdminDashboardContent = () => {
                         pricing: { ...galleryForm.pricing, digital: e.target.value }
                       })}
                       variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -1338,6 +1489,9 @@ const AdminDashboardContent = () => {
                         pricing: { ...galleryForm.pricing, smallPrint: e.target.value }
                       })}
                       variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -1357,6 +1511,9 @@ const AdminDashboardContent = () => {
                         pricing: { ...galleryForm.pricing, largePrint: e.target.value }
                       })}
                       variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: 2,
@@ -1473,6 +1630,7 @@ const AdminDashboardContent = () => {
             variant="contained" 
             onClick={handleGallerySubmit}
             size="large"
+            disabled={!galleryForm.imageUrl || !galleryForm.title || !galleryForm.category}
             startIcon={selectedGalleryItem ? <EditIcon /> : <AddIcon />}
             sx={{
               borderRadius: 2,
@@ -1483,6 +1641,10 @@ const AdminDashboardContent = () => {
               '&:hover': {
                 boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
                 transform: 'translateY(-1px)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[400],
+                boxShadow: 'none'
               },
               transition: 'all 0.3s ease'
             }}
@@ -1660,6 +1822,7 @@ const AdminDashboardContent = () => {
           <Button 
             onClick={handleSendReply} 
             variant="contained"
+            disabled={!replyText.trim()}
             sx={{
               borderRadius: 2,
               px: 4,
@@ -1667,6 +1830,9 @@ const AdminDashboardContent = () => {
               boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
               '&:hover': {
                 boxShadow: '0 6px 20px rgba(0,0,0,0.3)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[400]
               }
             }}
           >

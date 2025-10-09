@@ -651,36 +651,6 @@ const Register = () => {
               </Box>
             </Paper>
           </Fade>
-
-          {/* Demo Accounts Card */}
-          <Fade in timeout={1200}>
-            <Paper 
-              elevation={8}
-              sx={{ 
-                mt: 3, 
-                p: 3, 
-                width: '100%',
-                borderRadius: 3,
-                background: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'white'
-              }}
-            >
-              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: 'white' }}>
-                🚀 Quick Access
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
-                <strong>Admin Account:</strong> admin@josi.com / admin123
-              </Typography>
-              <Typography variant="body2" sx={{ mb: 1, opacity: 0.9 }}>
-                <strong>User Account:</strong> user@josi.com / user123
-              </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                Run "npm run seed:admin" in backend to create these accounts
-              </Typography>
-            </Paper>
-          </Fade>
         </Box>
       </Container>
     </Box>

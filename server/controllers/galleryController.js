@@ -1,6 +1,70 @@
 import asyncHandler from 'express-async-handler';
 import Gallery from '../models/Gallery.js';
 
+// @desc    Upload gallery image
+// @route   POST /api/gallery/upload
+// @access  Private/Admin
+const uploadGalleryImage = asyncHandler(async (req, res) => {
+  try {
+    console.log('📤 Upload request received:', {
+      hasFile: !!req.file,
+      fileInfo: req.file ? {
+        originalname: req.file.originalname,
+        filename: req.file.filename,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        path: req.file.path
+      } : 'No file'
+    });
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No image file uploaded'
+      });
+    }
+
+    const uploadResult = await Gallery.uploadImage(req.file, req.user.id);
+
+    // ✅ RETURN ABSOLUTE URL instead of relative
+    const absoluteImageUrl = `http://localhost:5000/uploads/gallery/${req.file.filename}`;
+
+    console.log('✅ Upload completed:', {
+      relativeUrl: uploadResult.imageUrl,
+      absoluteUrl: absoluteImageUrl,
+      filePath: req.file.path
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Image uploaded successfully',
+      imageUrl: absoluteImageUrl, // ✅ Changed to absolute URL
+      dimensions: uploadResult.dimensions,
+      fileMetadata: uploadResult.fileMetadata
+    });
+
+  } catch (error) {
+    console.error('🔴 Upload gallery image error:', error);
+    
+    if (req.file && req.file.path) {
+      try {
+        const fs = await import('fs');
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+          console.log('🗑️ Cleaned up failed upload:', req.file.path);
+        }
+      } catch (cleanupError) {
+        console.error('🔴 File cleanup error:', cleanupError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Image upload failed'
+    });
+  }
+});
+
 // @desc    Get all gallery items
 // @route   GET /api/gallery
 // @access  Public
@@ -40,6 +104,9 @@ const getGalleryItems = asyncHandler(async (req, res) => {
     // Get categories for filter
     const categories = await Gallery.distinct('category', { status: 'active' });
 
+    // Get gallery stats using the new method
+    const stats = await Gallery.getGalleryStats();
+
     res.json({
       success: true,
       data: galleryItems,
@@ -52,12 +119,12 @@ const getGalleryItems = asyncHandler(async (req, res) => {
       },
       categories: ['All', ...categories],
       stats: {
-        total,
-        featured: await Gallery.countDocuments({ ...filter, featured: true }),
-        byCategory: await Gallery.aggregate([
-          { $match: filter },
-          { $group: { _id: '$category', count: { $sum: 1 } } }
-        ])
+        total: stats.total,
+        featured: stats.featured,
+        active: stats.active,
+        downloads: stats.downloads,
+        orders: stats.orders,
+        byCategory: stats.byCategory
       }
     });
 
@@ -241,7 +308,7 @@ const updateGalleryItem = asyncHandler(async (req, res) => {
 // @access  Private/Admin
 const deleteGalleryItem = asyncHandler(async (req, res) => {
   try {
-    const galleryItem = await Gallery.findByIdAndDelete(req.params.id);
+    const galleryItem = await Gallery.findById(req.params.id);
 
     if (!galleryItem) {
       return res.status(404).json({
@@ -249,6 +316,15 @@ const deleteGalleryItem = asyncHandler(async (req, res) => {
         message: 'Gallery item not found'
       });
     }
+
+    // Use deleteOne to trigger the middleware for file cleanup
+    await Gallery.deleteOne({ _id: req.params.id });
+
+    console.log('🗑️ Gallery item deleted:', {
+      id: req.params.id,
+      title: galleryItem.title,
+      hadFile: !!(galleryItem.fileMetadata && galleryItem.fileMetadata.fileName)
+    });
 
     res.json({
       success: true,
@@ -271,13 +347,14 @@ const updateGalleryStats = asyncHandler(async (req, res) => {
   try {
     const { action } = req.body; // 'download' or 'order'
 
-    const updateField = action === 'download' ? 'downloadCount' : 'orderCount';
+    if (!action || !['download', 'order'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action. Use "download" or "order"'
+      });
+    }
 
-    const galleryItem = await Gallery.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { [updateField]: 1 } },
-      { new: true }
-    );
+    const galleryItem = await Gallery.findById(req.params.id);
 
     if (!galleryItem) {
       return res.status(404).json({
@@ -285,6 +362,20 @@ const updateGalleryStats = asyncHandler(async (req, res) => {
         message: 'Gallery item not found'
       });
     }
+
+    // Use the instance method for better control
+    if (action === 'download') {
+      await galleryItem.incrementDownloadCount();
+    } else if (action === 'order') {
+      await galleryItem.incrementOrderCount();
+    }
+
+    console.log('📈 Gallery stats updated:', {
+      id: galleryItem._id,
+      action: action,
+      newDownloadCount: galleryItem.downloadCount,
+      newOrderCount: galleryItem.orderCount
+    });
 
     res.json({
       success: true,
@@ -322,6 +413,47 @@ const getGalleryCategories = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Search gallery items with advanced filtering
+// @route   GET /api/gallery/search
+// @access  Public
+const searchGalleryItems = asyncHandler(async (req, res) => {
+  try {
+    const { 
+      q: searchTerm, 
+      category, 
+      page = 1, 
+      limit = 12 
+    } = req.query;
+
+    const result = await Gallery.searchGallery(
+      searchTerm, 
+      category, 
+      parseInt(page), 
+      parseInt(limit)
+    );
+
+    console.log('🔍 Gallery search performed:', {
+      searchTerm,
+      category,
+      page,
+      limit,
+      results: result.data.length
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+
+  } catch (error) {
+    console.error('🔴 Search gallery items error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Search failed'
+    });
+  }
+});
+
 export {
   getGalleryItems,
   getGalleryItem,
@@ -329,5 +461,7 @@ export {
   updateGalleryItem,
   deleteGalleryItem,
   updateGalleryStats,
-  getGalleryCategories
+  getGalleryCategories,
+  uploadGalleryImage, // NEW: Export the upload function
+  searchGalleryItems  // NEW: Export the search function
 };
