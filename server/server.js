@@ -7,6 +7,8 @@ import connectDB from './config/database.js';
 import authRoutes from './routes/authRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import galleryRoutes from './routes/gallery.js';
+import orderRoutes from './routes/orderRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js'; // ADD PAYMENT ROUTES
 
 // Load env vars
 dotenv.config();
@@ -43,6 +45,8 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/gallery', galleryRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes); // ADD PAYMENT ROUTES
 
 // ✅ ADD THESE DEBUG ROUTES (FIXED FOR ES MODULES):
 app.get('/api/debug/uploads', async (req, res) => {
@@ -116,12 +120,57 @@ app.get('/api/debug/file/:filename', async (req, res) => {
   }
 });
 
+// Payment test route (for sandbox testing)
+app.get('/api/payments/test-page', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Payment test endpoint is active',
+    testScenarios: [
+      {
+        name: 'Successful Payment',
+        endpoint: 'POST /api/payments/initialize',
+        body: { orderId: 'your_order_id', testMode: 'test_success' }
+      },
+      {
+        name: 'Failed Payment', 
+        endpoint: 'POST /api/payments/initialize',
+        body: { orderId: 'your_order_id', testMode: 'test_failure' }
+      }
+    ]
+  });
+});
+
+// Health check route
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Josi Photo Printing API is running!',
+    timestamp: new Date().toISOString(),
+    services: {
+      auth: '✅ Active',
+      contact: '✅ Active',
+      gallery: '✅ Active',
+      orders: '✅ Active',
+      payments: '✅ Active' // ADD PAYMENTS TO HEALTH CHECK
+    }
+  });
+});
+
 // Test route
 app.get('/', (req, res) => {
   res.json({ 
     success: true,
     message: 'Josi Photo Printing API is running!',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/auth',
+      contact: '/api/contact',
+      gallery: '/api/gallery',
+      orders: '/api/orders',
+      payments: '/api/payments', // ADD PAYMENTS TO ENDPOINTS LIST
+      health: '/api/health'
+    }
   });
 });
 
@@ -155,5 +204,10 @@ app.listen(PORT, () => {
   console.log(`🌐 API URL: http://localhost:${PORT}/api`);
   console.log(`📁 Uploads served from: http://localhost:${PORT}/uploads`);
   console.log(`🔧 Debug route: http://localhost:${PORT}/api/debug/uploads`);
+  console.log(`❤️  Health check: http://localhost:${PORT}/api/health`);
+  console.log(`💰 Payment API: http://localhost:${PORT}/api/payments`);
+  console.log(`🧪 Payment Test: http://localhost:${PORT}/api/payments/test-page`);
+  console.log('💳 Chapa Sandbox Mode: ACTIVE 🧪');
   console.log(`🗄️  MongoDB URI: ${process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/josi-photo-printing'}`);
+  console.log(`📦 Order routes: http://localhost:${PORT}/api/orders`);
 });

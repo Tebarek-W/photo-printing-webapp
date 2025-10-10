@@ -31,7 +31,14 @@ import {
   CardActions,
   Tooltip,
   alpha,
-  LinearProgress
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -52,14 +59,79 @@ import {
   Settings as SettingsIcon,
   LocalOffer as LocalOfferIcon,
   Category as CategoryIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  Update as UpdateIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
 
-// API service for gallery - UPDATED WITH UPLOAD FUNCTION
+// Order service for admin
+const orderService = {
+  // Get all orders
+  getAllOrders: async (page = 1, limit = 10, status = '') => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (status) params.append('status', status);
+    
+    const response = await fetch(`http://localhost:5000/api/orders/admin?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  },
+
+  // Get order by ID
+  getOrder: async (id) => {
+    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  },
+
+  // Update order status
+  updateOrderStatus: async (id, status) => {
+    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status })
+    });
+    return await response.json();
+  },
+
+  // Delete order
+  deleteOrder: async (id) => {
+    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  },
+
+  // Update order
+  updateOrder: async (id, orderData) => {
+    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(orderData)
+    });
+    return await response.json();
+  }
+};
+
+// Gallery service
 const galleryService = {
-  // Get all gallery items
   getGalleryItems: async (page = 1, limit = 50) => {
     const response = await fetch(`http://localhost:5000/api/gallery?page=${page}&limit=${limit}`, {
       headers: {
@@ -69,7 +141,6 @@ const galleryService = {
     return await response.json();
   },
 
-  // Upload image
   uploadImage: async (file) => {
     const formData = new FormData();
     formData.append('image', file);
@@ -84,7 +155,6 @@ const galleryService = {
     return await response.json();
   },
 
-  // Create gallery item
   createGalleryItem: async (data) => {
     const response = await fetch('http://localhost:5000/api/gallery', {
       method: 'POST',
@@ -97,7 +167,6 @@ const galleryService = {
     return await response.json();
   },
 
-  // Update gallery item
   updateGalleryItem: async (id, data) => {
     const response = await fetch(`http://localhost:5000/api/gallery/${id}`, {
       method: 'PUT',
@@ -110,7 +179,6 @@ const galleryService = {
     return await response.json();
   },
 
-  // Delete gallery item
   deleteGalleryItem: async (id) => {
     const response = await fetch(`http://localhost:5000/api/gallery/${id}`, {
       method: 'DELETE',
@@ -122,7 +190,7 @@ const galleryService = {
   }
 };
 
-// Contact service (keep your existing one)
+// Contact service
 const contactService = {
   getMessages: async (page = 1, limit = 50, status = '') => {
     const params = new URLSearchParams();
@@ -185,25 +253,6 @@ const contactService = {
   }
 };
 
-// Mock data for orders
-const mockOrders = [
-  {
-    id: 'ORD-001',
-    customer: 'John Doe',
-    email: 'john@example.com',
-    phone: '+1234567890',
-    serviceType: 'printing',
-    serviceDetails: 'T-shirts Printing',
-    quantity: 5,
-    totalAmount: 75.00,
-    status: 'pending',
-    date: '2024-01-15',
-    files: ['design1.jpg', 'design2.png'],
-    specialInstructions: 'Need this by next week',
-    address: '123 Main St, City, State'
-  }
-];
-
 const AdminDashboardContent = () => {
   const { user } = useAuth();
   const theme = useTheme();
@@ -232,6 +281,9 @@ const AdminDashboardContent = () => {
   const [uploading, setUploading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [selectedFile, setSelectedFile] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalOrders, setTotalOrders] = useState(0);
   
   const [galleryForm, setGalleryForm] = useState({
     title: '',
@@ -259,23 +311,60 @@ const AdminDashboardContent = () => {
     status: 'active'
   });
 
+  const [orderForm, setOrderForm] = useState({
+    status: '',
+    totalPrice: 0,
+    specialInstructions: ''
+  });
+
   useEffect(() => {
     loadInitialData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 0) {
+      loadOrders();
+    } else if (activeTab === 1) {
+      loadGalleryItems();
+    } else if (activeTab === 2) {
+      loadContactMessages();
+    }
+  }, [activeTab, page, rowsPerPage]);
+
   const loadInitialData = async () => {
-    setOrders(mockOrders);
+    await loadOrders();
     await loadGalleryItems();
     await loadContactMessages();
-    
-    setStats({
-      totalUsers: 156,
-      totalOrders: mockOrders.length,
-      revenue: mockOrders.reduce((sum, order) => sum + order.totalAmount, 0),
-      totalPhotos: galleryItems.length,
-      pendingOrders: mockOrders.filter(order => order.status === 'pending').length,
-      unreadMessages: contactMessages.filter(msg => msg.status === 'unread').length
-    });
+  };
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await orderService.getAllOrders(page + 1, rowsPerPage);
+      
+      if (response.success) {
+        setOrders(response.data.orders || []);
+        setTotalOrders(response.data.totalCount || 0);
+        
+        // Calculate stats
+        const pendingOrders = (response.data.orders || []).filter(order => order.status === 'pending').length;
+        const totalRevenue = (response.data.orders || []).reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+        
+        setStats(prev => ({
+          ...prev,
+          totalOrders: response.data.totalCount || 0,
+          revenue: totalRevenue,
+          pendingOrders: pendingOrders
+        }));
+      } else {
+        showSnackbar('Failed to load orders', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+      showSnackbar('Failed to load orders', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadGalleryItems = async () => {
@@ -284,10 +373,10 @@ const AdminDashboardContent = () => {
       const response = await galleryService.getGalleryItems();
       
       if (response.success) {
-        setGalleryItems(response.data);
+        setGalleryItems(response.data || []);
         setStats(prev => ({
           ...prev,
-          totalPhotos: response.data.length
+          totalPhotos: response.data?.length || 0
         }));
       } else {
         showSnackbar('Failed to load gallery items', 'error');
@@ -306,10 +395,11 @@ const AdminDashboardContent = () => {
       const response = await contactService.getMessages();
       
       if (response.success) {
-        setContactMessages(response.data);
+        setContactMessages(response.data || []);
+        const unreadCount = (response.data || []).filter(msg => msg.status === 'unread').length;
         setStats(prev => ({
           ...prev,
-          unreadMessages: response.stats?.unread || 0
+          unreadMessages: unreadCount
         }));
       } else {
         showSnackbar('Failed to load messages', 'error');
@@ -326,31 +416,25 @@ const AdminDashboardContent = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  // NEW: File upload handler
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       showSnackbar('Please select a valid image file (JPG, PNG, GIF, WebP)', 'error');
       return;
     }
 
-    // Validate file size (10MB)
     if (file.size > 10 * 1024 * 1024) {
       showSnackbar('File size must be less than 10MB', 'error');
       return;
     }
 
     setSelectedFile(file);
-    
-    // Auto-upload when file is selected
     handleImageUpload(file);
   };
 
-  // NEW: Image upload function
   const handleImageUpload = async (file) => {
     if (!file) return;
 
@@ -376,10 +460,90 @@ const AdminDashboardContent = () => {
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
-    if (newValue === 2) {
-      loadContactMessages();
-    } else if (newValue === 1) {
-      loadGalleryItems();
+    setPage(0);
+  };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Order Management Functions
+  const handleViewOrder = async (order) => {
+    try {
+      const response = await orderService.getOrder(order._id);
+      if (response.success) {
+        setSelectedOrder(response.data);
+        setOrderForm({
+          status: response.data.status,
+          totalPrice: response.data.totalPrice,
+          specialInstructions: response.data.orderDetails?.specialInstructions || ''
+        });
+        setOrderDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to view order:', error);
+      showSnackbar('Failed to load order details', 'error');
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const response = await orderService.updateOrderStatus(orderId, newStatus);
+      if (response.success) {
+        showSnackbar('Order status updated successfully!');
+        await loadOrders();
+        if (orderDialogOpen) {
+          setOrderDialogOpen(false);
+        }
+      } else {
+        showSnackbar('Failed to update order status', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      showSnackbar('Failed to update order status', 'error');
+    }
+  };
+
+  const handleUpdateOrder = async () => {
+    if (!selectedOrder) return;
+
+    try {
+      const response = await orderService.updateOrder(selectedOrder._id, orderForm);
+      if (response.success) {
+        showSnackbar('Order updated successfully!');
+        setOrderDialogOpen(false);
+        await loadOrders();
+      } else {
+        showSnackbar('Failed to update order', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to update order:', error);
+      showSnackbar('Failed to update order', 'error');
+    }
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (window.confirm('Are you sure you want to delete this order?')) {
+      try {
+        const response = await orderService.deleteOrder(orderId);
+        if (response.success) {
+          showSnackbar('Order deleted successfully!');
+          await loadOrders();
+          if (orderDialogOpen) {
+            setOrderDialogOpen(false);
+          }
+        } else {
+          showSnackbar('Failed to delete order', 'error');
+        }
+      } catch (error) {
+        console.error('Failed to delete order:', error);
+        showSnackbar('Failed to delete order', 'error');
+      }
     }
   };
 
@@ -598,7 +762,14 @@ const AdminDashboardContent = () => {
     });
   };
 
-  // Enhanced StatCard with modern styling
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  // Enhanced StatCard
   const StatCard = ({ icon, title, value, color, subtitle }) => (
     <Card sx={{ 
       height: '100%',
@@ -643,6 +814,171 @@ const AdminDashboardContent = () => {
         </Box>
       </CardContent>
     </Card>
+  );
+
+  // Order Management Tab Component
+  const OrderManagementTab = () => (
+    <Box>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 4,
+        p: 3,
+        background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.03)} 0%, ${alpha(theme.palette.secondary.main, 0.03)} 100%)`,
+        borderRadius: 3,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+      }}>
+        <Typography variant="h4" sx={{ 
+          fontWeight: 700,
+          background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+          backgroundClip: 'text',
+          textFillColor: 'transparent',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          Order Management
+        </Typography>
+        <Button 
+          startIcon={<RefreshIcon />}
+          onClick={loadOrders}
+          disabled={loading}
+          variant="outlined"
+          sx={{ borderRadius: 2 }}
+        >
+          Refresh
+        </Button>
+      </Box>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress size={50} />
+        </Box>
+      ) : orders.length === 0 ? (
+        <Paper sx={{ 
+          p: 6, 
+          textAlign: 'center',
+          background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.02)} 0%, ${alpha(theme.palette.secondary.main, 0.02)} 100%)`,
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+        }}>
+          <OrderIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+          <Typography variant="h5" color="textSecondary" gutterBottom sx={{ fontWeight: 600 }}>
+            No Orders Yet
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Customer orders will appear here once they start placing orders.
+          </Typography>
+        </Paper>
+      ) : (
+        <Box>
+          <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Order ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Service</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orders.map((order) => (
+                  <TableRow key={order._id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="600">
+                        {order._id.slice(-8).toUpperCase()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="body2" fontWeight="600">
+                          {order.customerName}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {order.customerEmail}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={order.serviceName} 
+                        size="small" 
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="600">
+                        {formatCurrency(order.totalPrice)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={order.status} 
+                        size="small" 
+                        color={getStatusColor(order.status)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {formatDate(order.createdAt)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Tooltip title="View Details">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => handleViewOrder(order)}
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Update Status">
+                          <IconButton 
+                            size="small" 
+                            color="warning"
+                            onClick={() => handleUpdateOrderStatus(order._id, 
+                              order.status === 'pending' ? 'in-progress' : 
+                              order.status === 'in-progress' ? 'completed' : 'pending'
+                            )}
+                          >
+                            <UpdateIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete">
+                          <IconButton 
+                            size="small" 
+                            color="error"
+                            onClick={() => handleDeleteOrder(order._id)}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={totalOrders}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Box>
+      )}
+    </Box>
   );
 
   // Gallery Management Tab Component
@@ -1165,19 +1501,203 @@ const AdminDashboardContent = () => {
 
       {/* Tab Content */}
       <Box sx={{ mt: 4 }}>
-        {activeTab === 0 && (
-          <Box>
-            <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, mb: 4 }}>
-              Order Management
-            </Typography>
-            {/* Order management content here */}
-          </Box>
-        )}
+        {activeTab === 0 && <OrderManagementTab />}
         {activeTab === 1 && <GalleryManagementTab />}
         {activeTab === 2 && <ContactManagementTab />}
       </Box>
 
-      {/* Enhanced Gallery Item Dialog with File Upload */}
+      {/* Order Detail Dialog */}
+      <Dialog 
+        open={orderDialogOpen} 
+        onClose={() => setOrderDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '60px',
+              height: '4px',
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              borderRadius: 2
+            }
+          }}
+        >
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <OrderIcon sx={{ fontSize: 28 }} />
+            Order Details
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          {selectedOrder && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  mb: 3, 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                    Customer Information
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Name:</strong> {selectedOrder.customerName}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Email:</strong> {selectedOrder.customerEmail}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Phone:</strong> {selectedOrder.orderDetails?.phone || 'Not provided'}
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Address:</strong> {selectedOrder.orderDetails?.address || 'Not provided'}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                    Order Information
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Service:</strong> {selectedOrder.serviceName}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Order ID:</strong> {selectedOrder._id}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Date:</strong> {formatDate(selectedOrder.createdAt)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Total Amount:</strong> {formatCurrency(selectedOrder.totalPrice)}
+                  </Typography>
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                    Update Order
+                  </Typography>
+                  
+                  <TextField
+                    fullWidth
+                    select
+                    label="Status"
+                    value={orderForm.status}
+                    onChange={(e) => setOrderForm({ ...orderForm, status: e.target.value })}
+                    sx={{ mb: 2 }}
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="in-progress">In Progress</MenuItem>
+                    <MenuItem value="completed">Completed</MenuItem>
+                    <MenuItem value="cancelled">Cancelled</MenuItem>
+                  </TextField>
+
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Total Price"
+                    value={orderForm.totalPrice}
+                    onChange={(e) => setOrderForm({ ...orderForm, totalPrice: parseFloat(e.target.value) })}
+                    sx={{ mb: 2 }}
+                    InputProps={{
+                      startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={3}
+                    label="Special Instructions"
+                    value={orderForm.specialInstructions}
+                    onChange={(e) => setOrderForm({ ...orderForm, specialInstructions: e.target.value })}
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setOrderDialogOpen(false)}
+            variant="outlined"
+            size="large"
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              borderColor: theme.palette.grey[400],
+              color: theme.palette.text.primary,
+              '&:hover': {
+                borderColor: theme.palette.grey[600],
+                backgroundColor: 'rgba(0,0,0,0.02)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleUpdateOrder}
+            size="large"
+            startIcon={<UpdateIcon />}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+              '&:hover': {
+                boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                transform: 'translateY(-1px)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Update Order
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Gallery Item Dialog */}
       <Dialog 
         open={galleryDialogOpen} 
         onClose={() => setGalleryDialogOpen(false)} 

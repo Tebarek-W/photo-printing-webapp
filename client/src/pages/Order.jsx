@@ -32,7 +32,8 @@ import {
   FormControlLabel,
   FormLabel,
   Tabs,
-  Tab
+  Tab,
+  CircularProgress
 } from '@mui/material';
 import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useDropzone } from 'react-dropzone';
@@ -54,7 +55,202 @@ import {
   PersonAdd
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from '../context/AuthContext'; // Add this import
+import { useAuth } from '../context/AuthContext';
+
+// API service for orders
+// In your frontend Order.jsx - update the orderService
+const orderService = {
+  // Create new order
+  createOrder: async (orderData) => {
+    try {
+      const response = await fetch('http://localhost:5000/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(orderData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to create order');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Create order error:', error);
+      throw error;
+    }
+  },
+
+  // Get user orders
+  getUserOrders: async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/orders/my-orders', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to fetch orders');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get user orders error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Get all orders
+  getAllOrders: async (page = 1, limit = 10, status = '') => {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('limit', limit);
+      if (status) params.append('status', status);
+      
+      const response = await fetch(`http://localhost:5000/api/orders/admin?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to fetch orders');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get all orders error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Get order stats
+  getOrderStats: async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/orders/admin/stats', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to fetch order stats');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get order stats error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Get order by ID
+  getOrder: async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to fetch order');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get order error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Update order status
+  updateOrderStatus: async (id, status) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update order status');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Update order status error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Update order
+  updateOrder: async (id, orderData) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to update order');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Update order error:', error);
+      throw error;
+    }
+  },
+
+  // Admin: Delete order
+  deleteOrder: async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete order');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Delete order error:', error);
+      throw error;
+    }
+  }
+};
 
 // Modern theme matching the Services page
 const modernTheme = {
@@ -162,20 +358,21 @@ const Order = () => {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { user, isAuthenticated, login } = useAuth(); // Add auth context
+  const { user, isAuthenticated, login } = useAuth();
   
-  // No default service selected initially
   const [selectedService, setSelectedService] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState({});
   const [files, setFiles] = useState([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [activeStep, setActiveStep] = useState(0);
   const [showServiceSelector, setShowServiceSelector] = useState(false);
-  const [inputMethod, setInputMethod] = useState('upload'); // 'upload' or 'describe'
+  const [inputMethod, setInputMethod] = useState('upload');
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const [orderDetails, setOrderDetails] = useState({
     serviceType: '',
@@ -184,7 +381,7 @@ const Order = () => {
     phone: '',
     address: '',
     specialInstructions: '',
-    projectDescription: '' // New field for project description
+    projectDescription: ''
   });
 
   const steps = ['Select Service', 'Provide Details', 'Review & Confirm'];
@@ -244,9 +441,7 @@ const Order = () => {
     }));
   };
 
-  // Modified handleNext to check authentication
   const handleNext = () => {
-    // If user is not authenticated and trying to proceed beyond service selection
     if (!isAuthenticated && activeStep >= 0) {
       setLoginDialogOpen(true);
       return;
@@ -259,9 +454,7 @@ const Order = () => {
     setActiveStep(prev => prev - 1);
   };
 
-  // Modified handleServiceSelect to check authentication
   const handleServiceSelect = (service) => {
-    // If user is not authenticated, show login dialog but remember the service
     if (!isAuthenticated) {
       setSelectedService(service);
       setLoginDialogOpen(true);
@@ -320,12 +513,10 @@ const Order = () => {
       case 1:
         if (!selectedService) return false;
         
-        // Check if user has provided either files OR description
         const hasFiles = files.length > 0;
         const hasDescription = orderDetails.projectDescription.trim().length > 0;
         const hasInput = inputMethod === 'upload' ? hasFiles : hasDescription;
         
-        // Check service-specific requirements
         switch (selectedService.id) {
           case 'printing':
             return hasInput && !!selectedOptions.printingType && !!selectedOptions.quantity;
@@ -343,17 +534,44 @@ const Order = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting order:', { 
-      selectedService, 
-      selectedOptions, 
-      files, 
-      orderDetails, 
-      inputMethod,
-      totalPrice: calculatePrice() 
-    });
-    setIsSubmitted(true);
+    setSubmitting(true);
+    setSubmitError('');
+
+    try {
+      const orderData = {
+        serviceType: selectedService.id,
+        serviceName: selectedService.name,
+        selectedOptions,
+        orderDetails,
+        inputMethod,
+        files: files.map(file => ({
+          name: file.name,
+          size: file.size,
+          type: file.type
+        })),
+        totalPrice: calculatePrice(),
+        status: 'pending',
+        customerId: user._id,
+        customerName: user.name,
+        customerEmail: user.email
+      };
+
+      const result = await orderService.createOrder(orderData);
+
+      if (result.success) {
+        setIsSubmitted(true);
+        console.log('Order created successfully:', result.data);
+      } else {
+        setSubmitError(result.message || 'Failed to create order. Please try again.');
+      }
+    } catch (error) {
+      console.error('Order submission error:', error);
+      setSubmitError('Network error. Please check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const resetOrder = () => {
@@ -372,9 +590,9 @@ const Order = () => {
       specialInstructions: '',
       projectDescription: ''
     });
+    setSubmitError('');
   };
 
-  // Login functions
   const handleLoginFromOrder = async (e) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -385,7 +603,6 @@ const Order = () => {
     if (result.success) {
       setLoginDialogOpen(false);
       setLoginData({ email: '', password: '' });
-      // If a service was selected before login, continue with it
       if (selectedService) {
         setShowServiceSelector(false);
       }
@@ -469,7 +686,6 @@ const Order = () => {
     </Dialog>
   );
 
-  // Login Dialog Component
   const LoginDialog = () => (
     <Dialog 
       open={loginDialogOpen} 
@@ -495,7 +711,6 @@ const Order = () => {
           </Typography>
         )}
 
-        {/* Demo Credentials */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Demo Credentials:
@@ -596,8 +811,6 @@ const Order = () => {
       </DialogContent>
     </Dialog>
   );
-
-
 
   const renderServiceOptions = () => {
     if (!selectedService) return null;
@@ -908,7 +1121,6 @@ const Order = () => {
         </Box>
 
         <Grid container spacing={4}>
-          {/* Upload Section */}
           <Grid item xs={12} md={6}>
             <Paper
               sx={{
@@ -1001,7 +1213,6 @@ const Order = () => {
             </Paper>
           </Grid>
 
-          {/* Description Section */}
           <Grid item xs={12} md={6}>
             <Paper
               sx={{
@@ -1043,7 +1254,6 @@ const Order = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4, minHeight: '100vh' }}>
-      {/* Add authentication status */}
       {isAuthenticated && (
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Chip
@@ -1091,7 +1301,6 @@ const Order = () => {
             {!isAuthenticated ? 'Please login to place an order' : selectedService ? `Configure your ${selectedService.name.toLowerCase()} order` : 'Select a service to get started'}
           </Typography>
 
-          {/* Show login prompt if not authenticated */}
           {!isAuthenticated && !selectedService && (
             <Alert 
               severity="info" 
@@ -1160,7 +1369,6 @@ const Order = () => {
         </motion.div>
       ) : (
         <Box>
-          {/* Service Selection Chip - Only show if service is selected */}
           {selectedService && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
               <Chip
@@ -1207,6 +1415,12 @@ const Order = () => {
               pointerEvents: !isAuthenticated && activeStep > 0 ? 'none' : 'auto'
             }}
           >
+            {submitError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {submitError}
+              </Alert>
+            )}
+
             <AnimatePresence mode="wait">
               {activeStep === 0 && (
                 <motion.div
@@ -1477,7 +1691,8 @@ const Order = () => {
                           variant="contained"
                           size="large"
                           onClick={handleSubmit}
-                          disabled={!isStepComplete()}
+                          disabled={!isStepComplete() || submitting}
+                          startIcon={submitting ? <CircularProgress size={20} /> : null}
                           sx={{
                             borderRadius: 3,
                             py: 1.5,
@@ -1486,7 +1701,7 @@ const Order = () => {
                             fontWeight: 600
                           }}
                         >
-                          Complete Order
+                          {submitting ? 'Submitting Order...' : 'Complete Order'}
                         </Button>
                       </Paper>
                     </Grid>
