@@ -33,9 +33,13 @@ import {
   FormLabel,
   Tabs,
   Tab,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar
 } from '@mui/material';
-import { Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { useDropzone } from 'react-dropzone';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -52,13 +56,87 @@ import {
   Description,
   Image,
   Login,
-  PersonAdd
+  PersonAdd,
+  CreditCard
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 
-// API service for orders
-// In your frontend Order.jsx - update the orderService
+// Payment service
+const paymentService = {
+  // Initialize payment
+  initializePayment: async (orderId, testMode = 'test_success') => {
+    try {
+      const response = await fetch('http://localhost:5000/api/payments/initialize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ orderId, testMode })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to initialize payment');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Initialize payment error:', error);
+      throw error;
+    }
+  },
+
+  // Verify payment
+  verifyPayment: async (tx_ref, testScenario = 'success') => {
+    try {
+      const response = await fetch('http://localhost:5000/api/payments/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tx_ref, testScenario })
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Payment verification failed');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Verify payment error:', error);
+      throw error;
+    }
+  },
+
+  // Get payment status
+  getPaymentStatus: async (orderId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/payments/status/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        }
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to fetch payment status');
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Get payment status error:', error);
+      throw error;
+    }
+  }
+};
+
+// Order service (updated)
 const orderService = {
   // Create new order
   createOrder: async (orderData) => {
@@ -107,78 +185,7 @@ const orderService = {
     }
   },
 
-  // Admin: Get all orders
-  getAllOrders: async (page = 1, limit = 10, status = '') => {
-    try {
-      const params = new URLSearchParams();
-      params.append('page', page);
-      params.append('limit', limit);
-      if (status) params.append('status', status);
-      
-      const response = await fetch(`http://localhost:5000/api/orders/admin?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch orders');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Get all orders error:', error);
-      throw error;
-    }
-  },
-
-  // Admin: Get order stats
-  getOrderStats: async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/orders/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch order stats');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Get order stats error:', error);
-      throw error;
-    }
-  },
-
-  // Admin: Get order by ID
-  getOrder: async (id) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to fetch order');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Get order error:', error);
-      throw error;
-    }
-  },
-
-  // Admin: Update order status
+  // Update order status
   updateOrderStatus: async (id, status) => {
     try {
       const response = await fetch(`http://localhost:5000/api/orders/admin/${id}/status`, {
@@ -201,54 +208,6 @@ const orderService = {
       console.error('Update order status error:', error);
       throw error;
     }
-  },
-
-  // Admin: Update order
-  updateOrder: async (id, orderData) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderData)
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to update order');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Update order error:', error);
-      throw error;
-    }
-  },
-
-  // Admin: Delete order
-  deleteOrder: async (id) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        }
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to delete order');
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('Delete order error:', error);
-      throw error;
-    }
   }
 };
 
@@ -261,6 +220,8 @@ const modernTheme = {
   darkText: '#1e293b',
   lightText: '#64748b',
   success: '#10b981',
+  error: '#ef4444',
+  warning: '#f59e0b',
   gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
   gradient2: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
   gradient3: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'
@@ -373,6 +334,12 @@ const Order = () => {
   const [loginLoading, setLoginLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const [orderDetails, setOrderDetails] = useState({
     serviceType: '',
@@ -384,7 +351,7 @@ const Order = () => {
     projectDescription: ''
   });
 
-  const steps = ['Select Service', 'Provide Details', 'Review & Confirm'];
+  const steps = ['Select Service', 'Provide Details', 'Review & Confirm', 'Payment'];
 
   // Auto-fill user info when authenticated
   useEffect(() => {
@@ -534,6 +501,10 @@ const Order = () => {
     }
   };
 
+  const showSnackbar = (message, severity = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -553,6 +524,7 @@ const Order = () => {
         })),
         totalPrice: calculatePrice(),
         status: 'pending',
+        paymentStatus: 'pending',
         customerId: user._id,
         customerName: user.name,
         customerEmail: user.email
@@ -561,16 +533,66 @@ const Order = () => {
       const result = await orderService.createOrder(orderData);
 
       if (result.success) {
-        setIsSubmitted(true);
+        setCreatedOrder(result.data);
+        setPaymentDialogOpen(true);
         console.log('Order created successfully:', result.data);
+        showSnackbar('Order created successfully! Proceeding to payment...', 'success');
       } else {
         setSubmitError(result.message || 'Failed to create order. Please try again.');
+        showSnackbar('Failed to create order', 'error');
       }
     } catch (error) {
       console.error('Order submission error:', error);
       setSubmitError('Network error. Please check your connection and try again.');
+      showSnackbar('Network error. Please try again.', 'error');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePayment = async (testMode = 'test_success') => {
+    if (!createdOrder) return;
+
+    setProcessingPayment(true);
+    setPaymentError('');
+
+    try {
+      const paymentResult = await paymentService.initializePayment(createdOrder._id, testMode);
+
+      if (paymentResult.success) {
+        showSnackbar('Payment initialized successfully!', 'success');
+        
+        // For sandbox testing, simulate payment verification
+        setTimeout(async () => {
+          try {
+            const verifyResult = await paymentService.verifyPayment(paymentResult.data.tx_ref, 'success');
+            
+            if (verifyResult.success) {
+              setPaymentSuccess(true);
+              setIsSubmitted(true);
+              setPaymentDialogOpen(false);
+              showSnackbar('Payment completed successfully! Your order is now being processed.', 'success');
+            } else {
+              setPaymentError('Payment verification failed. Please try again.');
+              showSnackbar('Payment verification failed', 'error');
+            }
+          } catch (verifyError) {
+            setPaymentError('Payment verification failed. Please try again.');
+            showSnackbar('Payment verification failed', 'error');
+          } finally {
+            setProcessingPayment(false);
+          }
+        }, 2000);
+      } else {
+        setPaymentError(paymentResult.message || 'Payment initialization failed');
+        setProcessingPayment(false);
+        showSnackbar('Payment initialization failed', 'error');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      setPaymentError('Payment processing failed. Please try again.');
+      setProcessingPayment(false);
+      showSnackbar('Payment processing failed', 'error');
     }
   };
 
@@ -591,6 +613,9 @@ const Order = () => {
       projectDescription: ''
     });
     setSubmitError('');
+    setCreatedOrder(null);
+    setPaymentSuccess(false);
+    setPaymentError('');
   };
 
   const handleLoginFromOrder = async (e) => {
@@ -606,8 +631,10 @@ const Order = () => {
       if (selectedService) {
         setShowServiceSelector(false);
       }
+      showSnackbar('Login successful!', 'success');
     } else {
       setLoginError(result.error);
+      showSnackbar('Login failed', 'error');
     }
     
     setLoginLoading(false);
@@ -809,6 +836,134 @@ const Order = () => {
           </Button>
         </Box>
       </DialogContent>
+    </Dialog>
+  );
+
+  const PaymentDialog = () => (
+    <Dialog 
+      open={paymentDialogOpen} 
+      onClose={() => !processingPayment && setPaymentDialogOpen(false)}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)'
+        }
+      }}
+    >
+      <DialogTitle sx={{ 
+        background: modernTheme.gradient,
+        color: 'white',
+        textAlign: 'center',
+        fontWeight: 700
+      }}>
+        <CreditCard sx={{ mr: 1, fontSize: 28 }} />
+        Complete Your Payment
+      </DialogTitle>
+      
+      <DialogContent sx={{ p: 4 }}>
+        {paymentError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {paymentError}
+          </Alert>
+        )}
+
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: 600 }}>
+            Order Summary
+          </Typography>
+          <Typography variant="body1" color="text.secondary" gutterBottom>
+            {selectedService?.name}
+          </Typography>
+          <Typography variant="h4" color={modernTheme.primary} sx={{ fontWeight: 700, my: 2 }}>
+            ${calculatePrice().toFixed(2)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Order ID: {createdOrder?._id?.slice(-8).toUpperCase()}
+          </Typography>
+        </Box>
+
+        <Alert severity="info" sx={{ mb: 3, borderRadius: 2 }}>
+          <Typography variant="body2">
+            <strong>Sandbox Mode:</strong> This is a test payment environment. 
+            No real money will be charged.
+          </Typography>
+        </Alert>
+
+        <Box sx={{ 
+          p: 3, 
+          backgroundColor: 'white', 
+          borderRadius: 3,
+          border: `1px solid ${modernTheme.primary}20`,
+          mb: 3
+        }}>
+          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
+            Test Payment Methods:
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={() => handlePayment('test_success')}
+              disabled={processingPayment}
+              startIcon={processingPayment ? <CircularProgress size={16} /> : <CheckCircle />}
+              sx={{
+                background: modernTheme.success,
+                '&:hover': { background: modernTheme.success },
+                borderRadius: 2
+              }}
+            >
+              Success Test
+            </Button>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={() => handlePayment('test_failure')}
+              disabled={processingPayment}
+              startIcon={<Close />}
+              sx={{ borderRadius: 2 }}
+            >
+              Failure Test
+            </Button>
+          </Box>
+        </Box>
+
+        {processingPayment && (
+          <Box sx={{ textAlign: 'center', py: 2 }}>
+            <CircularProgress size={40} sx={{ mb: 2 }} />
+            <Typography variant="body2" color="text.secondary">
+              Processing payment...
+            </Typography>
+          </Box>
+        )}
+      </DialogContent>
+      
+      <DialogActions sx={{ p: 3, gap: 2 }}>
+        <Button
+          onClick={() => setPaymentDialogOpen(false)}
+          disabled={processingPayment}
+          sx={{ borderRadius: 2 }}
+        >
+          Cancel Order
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => {
+            setPaymentDialogOpen(false);
+            setIsSubmitted(true);
+            showSnackbar('Order created! You can pay later from your orders page.', 'info');
+          }}
+          disabled={processingPayment}
+          sx={{
+            borderRadius: 2,
+            background: modernTheme.gradient,
+            px: 4
+          }}
+        >
+          Pay Later
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 
@@ -1329,6 +1484,22 @@ const Order = () => {
 
       <LoginDialog />
       <ServiceSelectorDialog />
+      <PaymentDialog />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          severity={snackbar.severity} 
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
       {isSubmitted ? (
         <motion.div
@@ -1347,24 +1518,44 @@ const Order = () => {
               mx: 'auto'
             }}
           >
-            <CheckCircle sx={{ fontSize: 80, color: modernTheme.success, mb: 3 }} />
+            <CheckCircle sx={{ fontSize: 80, color: paymentSuccess ? modernTheme.success : modernTheme.primary, mb: 3 }} />
             <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, mb: 2 }}>
-              Order Confirmed!
+              {paymentSuccess ? 'Payment Confirmed!' : 'Order Received!'}
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-              Thank you for your {selectedService?.name} order. We'll contact you within 24 hours.
+              {paymentSuccess 
+                ? `Thank you for your payment. Your ${selectedService?.name} order is now being processed.`
+                : `Thank you for your ${selectedService?.name} order. Please complete payment to start processing.`
+              }
             </Typography>
             <Typography variant="h6" sx={{ mb: 4, color: modernTheme.primary }}>
               Order Total: ${calculatePrice().toFixed(2)}
             </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={resetOrder}
-              sx={{ px: 4, borderRadius: 3 }}
-            >
-              Place Another Order
-            </Button>
+            {!paymentSuccess && (
+              <Alert severity="warning" sx={{ mb: 3, textAlign: 'left' }}>
+                <Typography variant="body2">
+                  Your order is pending payment. You can complete the payment later from your orders page.
+                </Typography>
+              </Alert>
+            )}
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={resetOrder}
+                sx={{ px: 4, borderRadius: 3 }}
+              >
+                Place Another Order
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                onClick={() => navigate('/orders')}
+                sx={{ px: 4, borderRadius: 3 }}
+              >
+                View My Orders
+              </Button>
+            </Box>
           </Paper>
         </motion.div>
       ) : (
@@ -1673,6 +1864,20 @@ const Order = () => {
                               }
                             />
                           </ListItem>
+
+                          <ListItem>
+                            <ListItemText 
+                              primary="Payment Status" 
+                              secondary={
+                                <Chip 
+                                  label="Pending" 
+                                  size="small" 
+                                  color="warning"
+                                  variant="outlined"
+                                />
+                              }
+                            />
+                          </ListItem>
                         </List>
 
                         <Divider sx={{ my: 2 }} />
@@ -1692,7 +1897,7 @@ const Order = () => {
                           size="large"
                           onClick={handleSubmit}
                           disabled={!isStepComplete() || submitting}
-                          startIcon={submitting ? <CircularProgress size={20} /> : null}
+                          startIcon={submitting ? <CircularProgress size={20} /> : <CreditCard />}
                           sx={{
                             borderRadius: 3,
                             py: 1.5,
@@ -1701,8 +1906,12 @@ const Order = () => {
                             fontWeight: 600
                           }}
                         >
-                          {submitting ? 'Submitting Order...' : 'Complete Order'}
+                          {submitting ? 'Creating Order...' : 'Proceed to Payment'}
                         </Button>
+                        
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block', textAlign: 'center' }}>
+                          You'll be redirected to secure payment after order creation
+                        </Typography>
                       </Paper>
                     </Grid>
                   </Grid>

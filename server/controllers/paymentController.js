@@ -69,6 +69,10 @@ export const initializePayment = async (req, res) => {
 
       await payment.save();
 
+      // Update order with payment reference
+      order.paymentId = payment._id;
+      await order.save();
+
       return res.json({
         success: true,
         message: 'Sandbox payment initialized successfully',
@@ -152,6 +156,13 @@ export const verifyPayment = async (req, res) => {
       payment.status = 'failed';
       payment.verificationResponse = { status: 'failed', message: 'Sandbox payment failed' };
       await payment.save();
+
+      // Update order payment status
+      const order = await Order.findById(payment.orderId);
+      if (order) {
+        order.paymentStatus = 'failed';
+        await order.save();
+      }
 
       return res.status(400).json({
         success: false,

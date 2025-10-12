@@ -8,7 +8,7 @@ import authRoutes from './routes/authRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import galleryRoutes from './routes/gallery.js';
 import orderRoutes from './routes/orderRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js'; // ADD PAYMENT ROUTES
+import paymentRoutes from './routes/paymentRoutes.js';
 
 // Load env vars
 dotenv.config();
@@ -32,7 +32,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Serve static files from uploads directory
+// Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Log all requests
@@ -46,9 +46,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/gallery', galleryRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/api/payments', paymentRoutes); // ADD PAYMENT ROUTES
+app.use('/api/payments', paymentRoutes);
 
-// ✅ ADD THESE DEBUG ROUTES (FIXED FOR ES MODULES):
+// Debug routes for uploads
 app.get('/api/debug/uploads', async (req, res) => {
   try {
     // Use dynamic import for fs
@@ -140,6 +140,130 @@ app.get('/api/payments/test-page', (req, res) => {
   });
 });
 
+// Admin payment stats route (for AdminDashboard)
+app.get('/api/payments/admin/stats', async (req, res) => {
+  try {
+    // Import models
+    const Order = (await import('./models/Order.js')).default;
+    const Payment = (await import('./models/Payment.js')).default;
+
+    // Get payment statistics
+    const paidOrders = await Order.countDocuments({ paymentStatus: 'paid' });
+    const pendingPayments = await Order.countDocuments({ paymentStatus: 'pending' });
+    const totalRevenue = await Order.aggregate([
+      { $match: { paymentStatus: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$totalPrice' } } }
+    ]);
+
+    // Get recent payments count
+    const recentPayments = await Payment.countDocuments({
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
+    });
+
+    res.json({
+      success: true,
+      data: {
+        paidOrders,
+        pendingPayments,
+        recentPayments,
+        totalRevenue: totalRevenue[0]?.total || 0
+      }
+    });
+  } catch (error) {
+    console.error('Payment stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payment statistics'
+    });
+  }
+});
+
+// Admin payments list route (for AdminDashboard)
+app.get('/api/payments/admin', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const status = req.query.status || '';
+    const skip = (page - 1) * limit;
+
+    // Import models
+    const Payment = (await import('./models/Payment.js')).default;
+
+    // Build query
+    const query = {};
+    if (status) {
+      query.status = status;
+    }
+
+    const payments = await Payment.find(query)
+      .populate('orderId')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalCount = await Payment.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: {
+        payments,
+        totalCount,
+        currentPage: page,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Admin payments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch payments'
+    });
+  }
+});
+
+// Update order payment status route (for AdminDashboard)
+app.put('/api/orders/admin/:id/payment-status', async (req, res) => {
+  try {
+    const { paymentStatus } = req.body;
+
+    // Import models
+    const Order = (await import('./models/Order.js')).default;
+    const Payment = (await import('./models/Payment.js')).default;
+
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Update order payment status
+    order.paymentStatus = paymentStatus;
+    await order.save();
+
+    // Also update the associated payment record if it exists
+    if (order.paymentId) {
+      await Payment.findByIdAndUpdate(order.paymentId, { 
+        status: paymentStatus === 'paid' ? 'completed' : paymentStatus 
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Order payment status updated successfully',
+      data: order
+    });
+  } catch (error) {
+    console.error('Update order payment status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update order payment status'
+    });
+  }
+});
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.json({
@@ -151,7 +275,7 @@ app.get('/api/health', (req, res) => {
       contact: '✅ Active',
       gallery: '✅ Active',
       orders: '✅ Active',
-      payments: '✅ Active' // ADD PAYMENTS TO HEALTH CHECK
+      payments: '✅ Active'
     }
   });
 });
@@ -168,7 +292,7 @@ app.get('/', (req, res) => {
       contact: '/api/contact',
       gallery: '/api/gallery',
       orders: '/api/orders',
-      payments: '/api/payments', // ADD PAYMENTS TO ENDPOINTS LIST
+      payments: '/api/payments',
       health: '/api/health'
     }
   });
@@ -206,6 +330,9 @@ app.listen(PORT, () => {
   console.log(`🔧 Debug route: http://localhost:${PORT}/api/debug/uploads`);
   console.log(`❤️  Health check: http://localhost:${PORT}/api/health`);
   console.log(`💰 Payment API: http://localhost:${PORT}/api/payments`);
+  console.log(`📊 Payment Stats: http://localhost:${PORT}/api/payments/admin/stats`);
+  console.log(`📈 Order Stats: http://localhost:${PORT}/api/orders/admin/stats`);
+  console.log(`🔄 Update Payment Status: PUT http://localhost:${PORT}/api/orders/admin/:id/payment-status`);
   console.log(`🧪 Payment Test: http://localhost:${PORT}/api/payments/test-page`);
   console.log('💳 Chapa Sandbox Mode: ACTIVE 🧪');
   console.log(`🗄️  MongoDB URI: ${process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/josi-photo-printing'}`);

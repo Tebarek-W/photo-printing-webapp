@@ -38,7 +38,12 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TablePagination
+  TablePagination,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider
 } from '@mui/material';
 import {
   People as PeopleIcon,
@@ -60,7 +65,11 @@ import {
   LocalOffer as LocalOfferIcon,
   Category as CategoryIcon,
   CloudUpload as CloudUploadIcon,
-  Update as UpdateIcon
+  Update as UpdateIcon,
+  Payment as PaymentIcon,
+  CreditCard as CreditCardIcon,
+  LocalShipping as LocalShippingIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import ProtectedRoute from '../../components/ProtectedRoute';
@@ -68,11 +77,12 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 // Order service for admin
 const orderService = {
   // Get all orders
-  getAllOrders: async (page = 1, limit = 10, status = '') => {
+  getAllOrders: async (page = 1, limit = 10, status = '', paymentStatus = '') => {
     const params = new URLSearchParams();
     params.append('page', page);
     params.append('limit', limit);
     if (status) params.append('status', status);
+    if (paymentStatus) params.append('paymentStatus', paymentStatus);
     
     const response = await fetch(`http://localhost:5000/api/orders/admin?${params.toString()}`, {
       headers: {
@@ -105,6 +115,19 @@ const orderService = {
     return await response.json();
   },
 
+  // Update payment status
+  updatePaymentStatus: async (id, paymentStatus) => {
+    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}/payment-status`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ paymentStatus })
+    });
+    return await response.json();
+  },
+
   // Delete order
   deleteOrder: async (id) => {
     const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
@@ -125,6 +148,54 @@ const orderService = {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(orderData)
+    });
+    return await response.json();
+  },
+
+  // Get order stats
+  getOrderStats: async () => {
+    const response = await fetch('http://localhost:5000/api/orders/admin/stats', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  }
+};
+
+// Payment service for admin
+const paymentService = {
+  // Get payment details
+  getPaymentDetails: async (orderId) => {
+    const response = await fetch(`http://localhost:5000/api/payments/status/${orderId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  },
+
+  // Get all payments
+  getAllPayments: async (page = 1, limit = 10, status = '') => {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('limit', limit);
+    if (status) params.append('status', status);
+    
+    const response = await fetch(`http://localhost:5000/api/payments/admin?${params.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
+    });
+    return await response.json();
+  },
+
+  // Get payment stats
+  getPaymentStats: async () => {
+    const response = await fetch('http://localhost:5000/api/payments/admin/stats', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      }
     });
     return await response.json();
   }
@@ -264,16 +335,23 @@ const AdminDashboardContent = () => {
     revenue: 0,
     totalPhotos: 0,
     pendingOrders: 0,
-    unreadMessages: 0
+    unreadMessages: 0,
+    paidOrders: 0,
+    pendingPayments: 0,
+    completedOrders: 0,
+    totalRevenue: 0
   });
   const [orders, setOrders] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [galleryItems, setGalleryItems] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [selectedGalleryItem, setSelectedGalleryItem] = useState(null);
   const [replyDialogOpen, setReplyDialogOpen] = useState(false);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [galleryDialogOpen, setGalleryDialogOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -284,6 +362,11 @@ const AdminDashboardContent = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [paymentPage, setPaymentPage] = useState(0);
+  const [paymentRowsPerPage, setPaymentRowsPerPage] = useState(10);
+  const [totalPayments, setTotalPayments] = useState(0);
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterPaymentStatus, setFilterPaymentStatus] = useState('');
   
   const [galleryForm, setGalleryForm] = useState({
     title: '',
@@ -313,6 +396,7 @@ const AdminDashboardContent = () => {
 
   const [orderForm, setOrderForm] = useState({
     status: '',
+    paymentStatus: '',
     totalPrice: 0,
     specialInstructions: ''
   });
@@ -325,43 +409,89 @@ const AdminDashboardContent = () => {
     if (activeTab === 0) {
       loadOrders();
     } else if (activeTab === 1) {
-      loadGalleryItems();
+      loadPayments();
     } else if (activeTab === 2) {
+      loadGalleryItems();
+    } else if (activeTab === 3) {
       loadContactMessages();
     }
-  }, [activeTab, page, rowsPerPage]);
+  }, [activeTab, page, rowsPerPage, paymentPage, paymentRowsPerPage, filterStatus, filterPaymentStatus]);
 
   const loadInitialData = async () => {
+    await loadStats();
     await loadOrders();
+    await loadPayments();
     await loadGalleryItems();
     await loadContactMessages();
+  };
+
+  const loadStats = async () => {
+    try {
+      const [orderStats, paymentStats] = await Promise.all([
+        orderService.getOrderStats(),
+        paymentService.getPaymentStats()
+      ]);
+
+      if (orderStats.success) {
+        setStats(prev => ({
+          ...prev,
+          totalOrders: orderStats.data.totalOrders || 0,
+          pendingOrders: orderStats.data.pendingOrders || 0,
+          completedOrders: orderStats.data.completedOrders || 0,
+          totalRevenue: orderStats.data.totalRevenue || 0
+        }));
+      }
+
+      if (paymentStats.success) {
+        setStats(prev => ({
+          ...prev,
+          paidOrders: paymentStats.data.paidOrders || 0,
+          pendingPayments: paymentStats.data.pendingPayments || 0
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
   };
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const response = await orderService.getAllOrders(page + 1, rowsPerPage);
+      const response = await orderService.getAllOrders(
+        page + 1, 
+        rowsPerPage, 
+        filterStatus, 
+        filterPaymentStatus
+      );
       
       if (response.success) {
         setOrders(response.data.orders || []);
         setTotalOrders(response.data.totalCount || 0);
-        
-        // Calculate stats
-        const pendingOrders = (response.data.orders || []).filter(order => order.status === 'pending').length;
-        const totalRevenue = (response.data.orders || []).reduce((sum, order) => sum + (order.totalPrice || 0), 0);
-        
-        setStats(prev => ({
-          ...prev,
-          totalOrders: response.data.totalCount || 0,
-          revenue: totalRevenue,
-          pendingOrders: pendingOrders
-        }));
       } else {
         showSnackbar('Failed to load orders', 'error');
       }
     } catch (error) {
       console.error('Failed to load orders:', error);
       showSnackbar('Failed to load orders', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPayments = async () => {
+    try {
+      setLoading(true);
+      const response = await paymentService.getAllPayments(paymentPage + 1, paymentRowsPerPage);
+      
+      if (response.success) {
+        setPayments(response.data.payments || []);
+        setTotalPayments(response.data.totalCount || 0);
+      } else {
+        showSnackbar('Failed to load payments', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to load payments:', error);
+      showSnackbar('Failed to load payments', 'error');
     } finally {
       setLoading(false);
     }
@@ -416,51 +546,10 @@ const AdminDashboardContent = () => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      showSnackbar('Please select a valid image file (JPG, PNG, GIF, WebP)', 'error');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      showSnackbar('File size must be less than 10MB', 'error');
-      return;
-    }
-
-    setSelectedFile(file);
-    handleImageUpload(file);
-  };
-
-  const handleImageUpload = async (file) => {
-    if (!file) return;
-
-    try {
-      setUploading(true);
-      
-      const response = await galleryService.uploadImage(file);
-
-      if (response.success) {
-        setGalleryForm({ ...galleryForm, imageUrl: response.imageUrl });
-        setSelectedFile(null);
-        showSnackbar('Image uploaded successfully!');
-      } else {
-        showSnackbar(response.message || 'Failed to upload image', 'error');
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      showSnackbar('Failed to upload image', 'error');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
     setPage(0);
+    setPaymentPage(0);
   };
 
   const handleChangePage = (event, newPage) => {
@@ -472,6 +561,15 @@ const AdminDashboardContent = () => {
     setPage(0);
   };
 
+  const handlePaymentChangePage = (event, newPage) => {
+    setPaymentPage(newPage);
+  };
+
+  const handlePaymentChangeRowsPerPage = (event) => {
+    setPaymentRowsPerPage(parseInt(event.target.value, 10));
+    setPaymentPage(0);
+  };
+
   // Order Management Functions
   const handleViewOrder = async (order) => {
     try {
@@ -480,6 +578,7 @@ const AdminDashboardContent = () => {
         setSelectedOrder(response.data);
         setOrderForm({
           status: response.data.status,
+          paymentStatus: response.data.paymentStatus,
           totalPrice: response.data.totalPrice,
           specialInstructions: response.data.orderDetails?.specialInstructions || ''
         });
@@ -491,12 +590,26 @@ const AdminDashboardContent = () => {
     }
   };
 
+  const handleViewPayment = async (order) => {
+    try {
+      const response = await paymentService.getPaymentDetails(order._id);
+      if (response.success) {
+        setSelectedPayment(response.data);
+        setPaymentDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Failed to view payment:', error);
+      showSnackbar('Failed to load payment details', 'error');
+    }
+  };
+
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
       const response = await orderService.updateOrderStatus(orderId, newStatus);
       if (response.success) {
         showSnackbar('Order status updated successfully!');
         await loadOrders();
+        await loadStats();
         if (orderDialogOpen) {
           setOrderDialogOpen(false);
         }
@@ -509,6 +622,26 @@ const AdminDashboardContent = () => {
     }
   };
 
+  const handleUpdatePaymentStatus = async (orderId, newPaymentStatus) => {
+    try {
+      const response = await orderService.updatePaymentStatus(orderId, newPaymentStatus);
+      if (response.success) {
+        showSnackbar('Payment status updated successfully!');
+        await loadOrders();
+        await loadPayments();
+        await loadStats();
+        if (orderDialogOpen) {
+          setOrderDialogOpen(false);
+        }
+      } else {
+        showSnackbar('Failed to update payment status', 'error');
+      }
+    } catch (error) {
+      console.error('Failed to update payment status:', error);
+      showSnackbar('Failed to update payment status', 'error');
+    }
+  };
+
   const handleUpdateOrder = async () => {
     if (!selectedOrder) return;
 
@@ -518,6 +651,7 @@ const AdminDashboardContent = () => {
         showSnackbar('Order updated successfully!');
         setOrderDialogOpen(false);
         await loadOrders();
+        await loadStats();
       } else {
         showSnackbar('Failed to update order', 'error');
       }
@@ -534,6 +668,7 @@ const AdminDashboardContent = () => {
         if (response.success) {
           showSnackbar('Order deleted successfully!');
           await loadOrders();
+          await loadStats();
           if (orderDialogOpen) {
             setOrderDialogOpen(false);
           }
@@ -607,6 +742,48 @@ const AdminDashboardContent = () => {
       setSelectedFile(null);
     }
     setGalleryDialogOpen(true);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      showSnackbar('Please select a valid image file (JPG, PNG, GIF, WebP)', 'error');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      showSnackbar('File size must be less than 10MB', 'error');
+      return;
+    }
+
+    setSelectedFile(file);
+    handleImageUpload(file);
+  };
+
+  const handleImageUpload = async (file) => {
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      
+      const response = await galleryService.uploadImage(file);
+
+      if (response.success) {
+        setGalleryForm({ ...galleryForm, imageUrl: response.imageUrl });
+        setSelectedFile(null);
+        showSnackbar('Image uploaded successfully!');
+      } else {
+        showSnackbar(response.message || 'Failed to upload image', 'error');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      showSnackbar('Failed to upload image', 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleGallerySubmit = async () => {
@@ -737,6 +914,7 @@ const AdminDashboardContent = () => {
       case 'active':
       case 'read':
       case 'replied':
+      case 'paid':
         return 'success';
       case 'in-progress':
         return 'warning';
@@ -746,7 +924,24 @@ const AdminDashboardContent = () => {
       case 'shipped':
         return 'info';
       case 'inactive':
+      case 'failed':
+      case 'cancelled':
         return 'default';
+      default:
+        return 'default';
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'failed':
+        return 'error';
+      case 'refunded':
+        return 'info';
       default:
         return 'default';
     }
@@ -839,15 +1034,46 @@ const AdminDashboardContent = () => {
         }}>
           Order Management
         </Typography>
-        <Button 
-          startIcon={<RefreshIcon />}
-          onClick={loadOrders}
-          disabled={loading}
-          variant="outlined"
-          sx={{ borderRadius: 2 }}
-        >
-          Refresh
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              select
+              size="small"
+              label="Status"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="">All Status</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="in-progress">In Progress</MenuItem>
+              <MenuItem value="completed">Completed</MenuItem>
+              <MenuItem value="cancelled">Cancelled</MenuItem>
+            </TextField>
+            <TextField
+              select
+              size="small"
+              label="Payment"
+              value={filterPaymentStatus}
+              onChange={(e) => setFilterPaymentStatus(e.target.value)}
+              sx={{ minWidth: 120 }}
+            >
+              <MenuItem value="">All Payments</MenuItem>
+              <MenuItem value="pending">Pending</MenuItem>
+              <MenuItem value="paid">Paid</MenuItem>
+              <MenuItem value="failed">Failed</MenuItem>
+            </TextField>
+          </Box>
+          <Button 
+            startIcon={<RefreshIcon />}
+            onClick={loadOrders}
+            disabled={loading}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
       {loading ? (
@@ -881,6 +1107,7 @@ const AdminDashboardContent = () => {
                   <TableCell sx={{ fontWeight: 600 }}>Service</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Payment</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
@@ -924,6 +1151,13 @@ const AdminDashboardContent = () => {
                       />
                     </TableCell>
                     <TableCell>
+                      <Chip 
+                        label={order.paymentStatus} 
+                        size="small" 
+                        color={getPaymentStatusColor(order.paymentStatus)}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <Typography variant="body2">
                         {formatDate(order.createdAt)}
                       </Typography>
@@ -937,6 +1171,15 @@ const AdminDashboardContent = () => {
                             onClick={() => handleViewOrder(order)}
                           >
                             <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Payment Details">
+                          <IconButton 
+                            size="small" 
+                            color="info"
+                            onClick={() => handleViewPayment(order)}
+                          >
+                            <PaymentIcon />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Update Status">
@@ -975,6 +1218,164 @@ const AdminDashboardContent = () => {
             page={page}
             onPageChange={handleChangePage}
             onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </Box>
+      )}
+    </Box>
+  );
+
+  // Payment Management Tab Component
+  const PaymentManagementTab = () => (
+    <Box>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        mb: 4,
+        p: 3,
+        background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.03)} 0%, ${alpha(theme.palette.info.main, 0.03)} 100%)`,
+        borderRadius: 3,
+        border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
+      }}>
+        <Typography variant="h4" sx={{ 
+          fontWeight: 700,
+          background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+          backgroundClip: 'text',
+          textFillColor: 'transparent',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+        }}>
+          Payment Management
+        </Typography>
+        <Button 
+          startIcon={<RefreshIcon />}
+          onClick={loadPayments}
+          disabled={loading}
+          variant="outlined"
+          sx={{ borderRadius: 2 }}
+        >
+          Refresh
+        </Button>
+      </Box>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+          <CircularProgress size={50} />
+        </Box>
+      ) : payments.length === 0 ? (
+        <Paper sx={{ 
+          p: 6, 
+          textAlign: 'center',
+          background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.02)} 0%, ${alpha(theme.palette.info.main, 0.02)} 100%)`,
+          borderRadius: 3,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+        }}>
+          <CreditCardIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
+          <Typography variant="h5" color="textSecondary" gutterBottom sx={{ fontWeight: 600 }}>
+            No Payments Yet
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Payment records will appear here once customers start making payments.
+          </Typography>
+        </Paper>
+      ) : (
+        <Box>
+          <TableContainer component={Paper} sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>Transaction ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Order ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Customer</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Amount</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Method</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {payments.map((payment) => (
+                  <TableRow key={payment._id} hover>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="600">
+                        {payment.tx_ref}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {payment.orderId?._id?.slice(-8).toUpperCase() || 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {payment.orderId?.customerName || 'N/A'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="600">
+                        {formatCurrency(payment.amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={payment.status} 
+                        size="small" 
+                        color={getPaymentStatusColor(payment.status)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={payment.paymentMethod} 
+                        size="small" 
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {formatDate(payment.createdAt)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Tooltip title="View Details">
+                          <IconButton 
+                            size="small" 
+                            color="primary"
+                            onClick={() => {
+                              setSelectedPayment(payment);
+                              setPaymentDialogOpen(true);
+                            }}
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        {payment.status === 'pending' && (
+                          <Tooltip title="Mark as Paid">
+                            <IconButton 
+                              size="small" 
+                              color="success"
+                              onClick={() => handleUpdatePaymentStatus(payment.orderId?._id, 'paid')}
+                            >
+                              <CheckCircleIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={totalPayments}
+            rowsPerPage={paymentRowsPerPage}
+            page={paymentPage}
+            onPageChange={handlePaymentChangePage}
+            onRowsPerPageChange={handlePaymentChangeRowsPerPage}
           />
         </Box>
       )}
@@ -1419,8 +1820,18 @@ const AdminDashboardContent = () => {
           <StatCard
             icon={<MoneyIcon />}
             title="Revenue"
-            value={`$${stats.revenue}`}
+            value={`$${stats.totalRevenue}`}
             color={theme.palette.warning.main}
+            subtitle={`${stats.paidOrders} paid`}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={2}>
+          <StatCard
+            icon={<CreditCardIcon />}
+            title="Payments"
+            value={stats.paidOrders}
+            color={theme.palette.info.main}
+            subtitle={`${stats.pendingPayments} pending`}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
@@ -1428,7 +1839,7 @@ const AdminDashboardContent = () => {
             icon={<PhotoIcon />}
             title="Gallery Items"
             value={stats.totalPhotos}
-            color={theme.palette.info.main}
+            color={theme.palette.secondary.main}
           />
         </Grid>
         <Grid item xs={12} sm={6} md={2}>
@@ -1438,15 +1849,6 @@ const AdminDashboardContent = () => {
             value={contactMessages.length}
             color={theme.palette.error.main}
             subtitle={`${stats.unreadMessages} unread`}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={2}>
-          <StatCard
-            icon={<ChatIcon />}
-            title="Response Rate"
-            value="92%"
-            color={theme.palette.success.main}
-            subtitle="This month"
           />
         </Grid>
       </Grid>
@@ -1485,6 +1887,14 @@ const AdminDashboardContent = () => {
             } 
           />
           <Tab 
+            icon={<CreditCardIcon />} 
+            label={
+              <Badge badgeContent={stats.pendingPayments} color="error" showZero={false}>
+                Payments
+              </Badge>
+            } 
+          />
+          <Tab 
             icon={<PhotoIcon />} 
             label="Gallery" 
           />
@@ -1502,8 +1912,9 @@ const AdminDashboardContent = () => {
       {/* Tab Content */}
       <Box sx={{ mt: 4 }}>
         {activeTab === 0 && <OrderManagementTab />}
-        {activeTab === 1 && <GalleryManagementTab />}
-        {activeTab === 2 && <ContactManagementTab />}
+        {activeTab === 1 && <PaymentManagementTab />}
+        {activeTab === 2 && <GalleryManagementTab />}
+        {activeTab === 3 && <ContactManagementTab />}
       </Box>
 
       {/* Order Detail Dialog */}
@@ -1596,6 +2007,16 @@ const AdminDashboardContent = () => {
                   <Typography variant="body2" sx={{ mb: 1 }}>
                     <strong>Total Amount:</strong> {formatCurrency(selectedOrder.totalPrice)}
                   </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                    <Chip 
+                      label={selectedOrder.status} 
+                      color={getStatusColor(selectedOrder.status)}
+                    />
+                    <Chip 
+                      label={selectedOrder.paymentStatus} 
+                      color={getPaymentStatusColor(selectedOrder.paymentStatus)}
+                    />
+                  </Box>
                 </Box>
               </Grid>
 
@@ -1626,6 +2047,20 @@ const AdminDashboardContent = () => {
 
                   <TextField
                     fullWidth
+                    select
+                    label="Payment Status"
+                    value={orderForm.paymentStatus}
+                    onChange={(e) => setOrderForm({ ...orderForm, paymentStatus: e.target.value })}
+                    sx={{ mb: 2 }}
+                  >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="paid">Paid</MenuItem>
+                    <MenuItem value="failed">Failed</MenuItem>
+                    <MenuItem value="refunded">Refunded</MenuItem>
+                  </TextField>
+
+                  <TextField
+                    fullWidth
                     type="number"
                     label="Total Price"
                     value={orderForm.totalPrice}
@@ -1645,6 +2080,30 @@ const AdminDashboardContent = () => {
                     onChange={(e) => setOrderForm({ ...orderForm, specialInstructions: e.target.value })}
                   />
                 </Box>
+
+                {selectedOrder.selectedOptions && (
+                  <Box sx={{ 
+                    mt: 3, 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                      Service Options
+                    </Typography>
+                    <List dense>
+                      {Object.entries(selectedOrder.selectedOptions).map(([key, value]) => (
+                        <ListItem key={key}>
+                          <ListItemText 
+                            primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                            secondary={String(value)}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+                )}
               </Grid>
             </Grid>
           )}
@@ -1694,6 +2153,205 @@ const AdminDashboardContent = () => {
           >
             Update Order
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Payment Detail Dialog */}
+      <Dialog 
+        open={paymentDialogOpen} 
+        onClose={() => setPaymentDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '60px',
+              height: '4px',
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              borderRadius: 2
+            }
+          }}
+        >
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <CreditCardIcon sx={{ fontSize: 28 }} />
+            Payment Details
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          {selectedPayment && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  mb: 3, 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                    Payment Information
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Transaction ID:</strong> {selectedPayment.tx_ref}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Chapa Transaction ID:</strong> {selectedPayment.chapaTransactionId || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Amount:</strong> {formatCurrency(selectedPayment.amount)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Currency:</strong> {selectedPayment.currency}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Status:</strong> 
+                    <Chip 
+                      label={selectedPayment.status} 
+                      size="small" 
+                      color={getPaymentStatusColor(selectedPayment.status)}
+                      sx={{ ml: 1 }}
+                    />
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Payment Method:</strong> {selectedPayment.paymentMethod}
+                  </Typography>
+                  {selectedPayment.testMode && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        This is a test payment (Sandbox Mode)
+                      </Typography>
+                    </Alert>
+                  )}
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                    Order Information
+                  </Typography>
+                  {selectedPayment.orderId ? (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Order ID:</strong> {selectedPayment.orderId._id}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Customer:</strong> {selectedPayment.orderId.customerName}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Service:</strong> {selectedPayment.orderId.serviceName}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Order Status:</strong> 
+                        <Chip 
+                          label={selectedPayment.orderId.status} 
+                          size="small" 
+                          color={getStatusColor(selectedPayment.orderId.status)}
+                          sx={{ ml: 1 }}
+                        />
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Payment Status:</strong> 
+                        <Chip 
+                          label={selectedPayment.orderId.paymentStatus} 
+                          size="small" 
+                          color={getPaymentStatusColor(selectedPayment.orderId.paymentStatus)}
+                          sx={{ ml: 1 }}
+                        />
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      Order information not available
+                    </Typography>
+                  )}
+                </Box>
+
+                {(selectedPayment.paidAt || selectedPayment.createdAt) && (
+                  <Box sx={{ 
+                    mt: 3, 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                      Payment Timeline
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Created:</strong> {formatDate(selectedPayment.createdAt)}
+                    </Typography>
+                    {selectedPayment.paidAt && (
+                      <Typography variant="body2">
+                        <strong>Paid At:</strong> {formatDate(selectedPayment.paidAt)}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setPaymentDialogOpen(false)}
+            variant="outlined"
+            size="large"
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+            }}
+          >
+            Close
+          </Button>
+          {selectedPayment?.orderId && selectedPayment.status === 'pending' && (
+            <Button 
+              variant="contained" 
+              onClick={() => handleUpdatePaymentStatus(selectedPayment.orderId._id, 'paid')}
+              size="large"
+              startIcon={<CheckCircleIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1,
+                background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+              }}
+            >
+              Mark as Paid
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

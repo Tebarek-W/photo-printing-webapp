@@ -42,7 +42,6 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'in-progress', 'completed', 'cancelled'],
     default: 'pending'
   },
-  // ADD PAYMENT STATUS FIELD
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid', 'failed', 'refunded'],
@@ -60,6 +59,10 @@ const orderSchema = new mongoose.Schema({
   customerEmail: {
     type: String,
     required: true
+  },
+  paymentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Payment'
   }
 }, {
   timestamps: true
@@ -68,7 +71,7 @@ const orderSchema = new mongoose.Schema({
 // Index for better query performance
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
-orderSchema.index({ paymentStatus: 1 }); // ADD INDEX FOR PAYMENT STATUS
+orderSchema.index({ paymentStatus: 1 });
 orderSchema.index({ createdAt: -1 });
 
 export default mongoose.model('Order', orderSchema);
