@@ -264,6 +264,52 @@ app.put('/api/orders/admin/:id/payment-status', async (req, res) => {
   }
 });
 
+// Add to your server.js after existing routes
+
+// Pay Later test route
+app.get('/api/orders/pending/test', async (req, res) => {
+  try {
+    const Order = (await import('./models/Order.js')).default;
+    
+    // Create a test pending order
+    const testOrder = new Order({
+      serviceType: 'printing',
+      serviceName: 'Test Printing Service',
+      selectedOptions: { printingType: 'tshirts', quantity: 1 },
+      orderDetails: {
+        customerName: 'Test User',
+        email: 'test@example.com',
+        phone: '1234567890',
+        address: 'Test Address',
+        specialInstructions: 'Test instructions'
+      },
+      inputMethod: 'upload',
+      files: [],
+      totalPrice: 25,
+      status: 'pending',
+      paymentStatus: 'pending',
+      customerId: '65a1b2c3d4e5f6a7b8c9d0e1', // Use a real user ID from your DB
+      customerName: 'Test User',
+      customerEmail: 'test@example.com',
+      allowPayLater: true,
+      paymentExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+
+    await testOrder.save();
+
+    res.json({
+      success: true,
+      message: 'Test pending order created',
+      order: testOrder
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Health check route
 app.get('/api/health', (req, res) => {
   res.json({

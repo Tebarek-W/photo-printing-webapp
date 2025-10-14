@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AppBar,
@@ -19,12 +19,14 @@ import {
   Divider,
   Chip,
   CircularProgress,
+  Badge,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
 import { styled } from "@mui/material/styles";
 
 import profilePhoto from "../assets/profile.jpg";
@@ -89,6 +91,15 @@ const Navbar = () => {
     });
   }
 
+  // Add Pending Orders link for authenticated users
+  if (isAuthenticated) {
+    navItems.push({ 
+      name: "Pending Orders", 
+      path: "/pending-orders",
+      icon: <PendingActionsIcon sx={{ fontSize: 18, mr: 1 }} />
+    });
+  }
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
@@ -111,6 +122,12 @@ const Navbar = () => {
   const handleDashboard = () => {
     navigate(user?.role === 'admin' ? '/admin' : '/');
     handleProfileMenuClose();
+  };
+
+  const handlePendingOrders = () => {
+    navigate('/pending-orders');
+    handleProfileMenuClose();
+    setMobileOpen(false);
   };
 
   // Show loading spinner while auth is loading
@@ -159,9 +176,10 @@ const Navbar = () => {
                 }
               }}
             >
+              {item.icon && React.cloneElement(item.icon, { sx: { fontSize: 20, mr: 2, color: 'white' } })}
               <ListItemText 
                 primary={item.name} 
-                sx={{ color: "white" }} 
+                sx={{ color: "white", textAlign: item.icon ? 'left' : 'center' }} 
               />
             </ListItemButton>
           </ListItem>
@@ -311,10 +329,20 @@ const Navbar = () => {
         </Box>
       </MenuItem>
       <Divider />
+      
+      {/* Quick Actions in Profile Menu */}
       <MenuItem onClick={handleDashboard}>
         <DashboardIcon sx={{ mr: 2, fontSize: 20 }} />
         Dashboard
       </MenuItem>
+      
+      {isAuthenticated && (
+        <MenuItem onClick={handlePendingOrders}>
+          <PendingActionsIcon sx={{ mr: 2, fontSize: 20 }} />
+          Pending Orders
+        </MenuItem>
+      )}
+      
       <Divider />
       <MenuItem onClick={handleLogout}>
         <LogoutIcon sx={{ mr: 2, fontSize: 20 }} />

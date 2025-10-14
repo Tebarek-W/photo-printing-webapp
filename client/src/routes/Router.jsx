@@ -1,4 +1,3 @@
-
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import MainLayout from '../layout/MainLayout';
 import Home from '../pages/Home';
@@ -9,6 +8,7 @@ import Contact from '../pages/Contact';
 import AdminDashboard from '../pages/Admin/Dashboard';
 import Login from '../pages/Auth/Login';
 import Register from '../pages/Auth/Register';
+import PendingOrders from '../components/PendingOrders'; // Add this import
 
 const router = createBrowserRouter([
   {
@@ -23,6 +23,11 @@ const router = createBrowserRouter([
       { 
         path: '/admin', 
         element: <AdminDashboard />,
+      },
+      // Add this route for Pending Orders
+      { 
+        path: '/pending-orders', 
+        element: <PendingOrders />,
       },
     ],
   },

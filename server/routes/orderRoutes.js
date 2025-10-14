@@ -9,24 +9,35 @@ import {
   updateOrder,
   deleteOrder,
   getOrderStats,
-  getOrderAnalytics
+  getOrderAnalytics,
+  getRecentOrders,
+  // New pay later routes
+  getPendingOrders,
+  saveOrderForLater,
+  resumeOrderPayment
 } from '../controllers/orderController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// User routes
+// Public routes (none)
+
+// Protected routes (authenticated users)
 router.post('/', protect, createOrder);
 router.get('/my-orders', protect, getUserOrders);
+router.get('/pending', protect, getPendingOrders); // Get pending orders for payment
+router.post('/pay-later', protect, saveOrderForLater); // Explicit pay later
+router.post('/resume-payment', protect, resumeOrderPayment); // Resume payment
 
 // Admin routes
-router.get('/admin', protect, getAllOrders);
-router.get('/admin/stats', protect, getOrderStats);
-router.get('/admin/analytics', protect, getOrderAnalytics);
-router.get('/admin/:id', protect, getOrderById);
-router.put('/admin/:id/status', protect, updateOrderStatus);
-router.put('/admin/:id/payment-status', protect, updateOrderPaymentStatus);
-router.put('/admin/:id', protect, updateOrder);
-router.delete('/admin/:id', protect, deleteOrder);
+router.get('/admin', protect, admin, getAllOrders);
+router.get('/admin/stats', protect, admin, getOrderStats);
+router.get('/admin/analytics', protect, admin, getOrderAnalytics);
+router.get('/admin/recent', protect, admin, getRecentOrders);
+router.get('/admin/:id', protect, admin, getOrderById);
+router.put('/admin/:id/status', protect, admin, updateOrderStatus);
+router.put('/admin/:id/payment-status', protect, admin, updateOrderPaymentStatus);
+router.put('/admin/:id', protect, admin, updateOrder);
+router.delete('/admin/:id', protect, admin, deleteOrder);
 
 export default router;
