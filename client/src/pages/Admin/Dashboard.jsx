@@ -126,22 +126,6 @@ const orderService = {
     return await response.json();
   },
 
-  updatePaymentStatus: async (id, paymentStatus) => {
-    if (!id) {
-      throw new Error('Order ID is required');
-    }
-    
-    const response = await fetch(`http://localhost:5000/api/orders/admin/${id}/payment-status`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ paymentStatus })
-    });
-    return await response.json();
-  },
-
   deleteOrder: async (id) => {
     const response = await fetch(`http://localhost:5000/api/orders/admin/${id}`, {
       method: 'DELETE',
@@ -525,8 +509,8 @@ const MobileNavDrawer = ({ open, onClose, activeTab, onTabChange }) => {
   );
 };
 
-// Fixed ResponsiveTable Component
-const ResponsiveTable = ({ headers, children, loading, data }) => {
+// Fixed Responsive Table Component
+const ResponsiveTable = ({ headers, data, loading, children, renderMobileCard }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -534,7 +518,24 @@ const ResponsiveTable = ({ headers, children, loading, data }) => {
   if (isMobile) {
     return (
       <Box>
-        {children}
+        {data.map((row, index) => (
+          <Card key={index} sx={{ mb: 2, p: 2, borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+            {renderMobileCard ? renderMobileCard(row) : (
+              <Box>
+                {headers.map((header, headerIndex) => (
+                  <Box key={headerIndex} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: headerIndex < headers.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none' }}>
+                    <Typography variant="body2" fontWeight="600" color="textSecondary">
+                      {header}:
+                    </Typography>
+                    <Typography variant="body2">
+                      {getRowValue(row, header)}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+          </Card>
+        ))}
       </Box>
     );
   }
@@ -559,197 +560,23 @@ const ResponsiveTable = ({ headers, children, loading, data }) => {
   );
 };
 
-// Mobile Order Card for responsive view
-const MobileOrderCard = ({ order, onView, onUpdateStatus, onDelete }) => {
-  const theme = useTheme();
-  const isSmallMobile = useMediaQuery(theme.breakpoints.down('sm'));
+// Helper function to get row value for mobile view
+const getRowValue = (row, header) => {
+  // Simple mapping for common fields - you can customize this based on your data structure
+  const fieldMap = {
+    'Order ID': row._id?.slice(-8).toUpperCase(),
+    'Customer': row.customerName,
+    'Service': row.serviceName,
+    'Amount': row.totalPrice,
+    'Status': row.status,
+    'Payment': row.paymentStatus,
+    'Date': row.createdAt,
+    'Transaction ID': row.tx_ref,
+    'Method': row.paymentMethod,
+    // Add more mappings as needed
+  };
 
-  return (
-    <Card sx={{ mb: 2, p: 2, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Order: {order._id.slice(-8).toUpperCase()}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            {order.customerName}
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            {order.customerEmail}
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-          <Chip 
-            label={order.status} 
-            size="small" 
-            color={getStatusColor(order.status)}
-            sx={{ fontSize: '0.7rem' }}
-          />
-          <Chip 
-            label={order.paymentStatus} 
-            size="small" 
-            color={getPaymentStatusColor(order.paymentStatus)}
-            sx={{ fontSize: '0.7rem' }}
-          />
-        </Box>
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="body2" fontWeight="bold">
-          {formatCurrency(order.totalPrice)}
-        </Typography>
-        <Typography variant="caption" color="textSecondary">
-          {formatDate(order.createdAt)}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-        <IconButton 
-          size="small" 
-          color="primary"
-          onClick={() => onView(order)}
-          sx={{ flex: 1 }}
-        >
-          <ViewIcon />
-        </IconButton>
-        <IconButton 
-          size="small" 
-          color="warning"
-          onClick={() => onUpdateStatus(order._id, 
-            order.status === 'pending' ? 'in-progress' : 
-            order.status === 'in-progress' ? 'completed' : 'pending'
-          )}
-          sx={{ flex: 1 }}
-        >
-          <UpdateIcon />
-        </IconButton>
-        <IconButton 
-          size="small" 
-          color="error"
-          onClick={() => onDelete(order._id)}
-          sx={{ flex: 1 }}
-        >
-          <DeleteIcon />
-        </IconButton>
-      </Box>
-    </Card>
-  );
-};
-
-// Mobile Payment Card for responsive view
-const MobilePaymentCard = ({ payment, onView, onMarkAsPaid }) => {
-  const theme = useTheme();
-
-  return (
-    <Card sx={{ mb: 2, p: 2, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-        <Box>
-          <Typography variant="subtitle2" fontWeight="bold">
-            {payment.tx_ref}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            {payment.orderId?.customerName || 'N/A'}
-          </Typography>
-          <Typography variant="caption" color="textSecondary">
-            Order: {payment.orderId?._id?.slice(-8).toUpperCase() || 'N/A'}
-          </Typography>
-        </Box>
-        <Chip 
-          label={payment.status} 
-          size="small" 
-          color={getPaymentStatusColor(payment.status)}
-          sx={{ fontSize: '0.7rem' }}
-        />
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="body2" fontWeight="bold">
-          {formatCurrency(payment.amount)}
-        </Typography>
-        <Typography variant="caption" color="textSecondary">
-          {formatDate(payment.createdAt)}
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-        <IconButton 
-          size="small" 
-          color="primary"
-          onClick={() => onView(payment)}
-          sx={{ flex: 1 }}
-        >
-          <ViewIcon />
-        </IconButton>
-        {payment.status === 'pending' && payment.orderId?._id && (
-          <IconButton 
-            size="small" 
-            color="success"
-            onClick={() => onMarkAsPaid(payment.orderId._id)}
-            sx={{ flex: 1 }}
-          >
-            <CheckCircleIcon />
-          </IconButton>
-        )}
-      </Box>
-    </Card>
-  );
-};
-
-// Helper functions
-const getStatusColor = (status) => {
-  switch (status) {
-    case 'completed':
-    case 'active':
-    case 'read':
-    case 'replied':
-    case 'paid':
-      return 'success';
-    case 'in-progress':
-      return 'warning';
-    case 'pending':
-    case 'unread':
-      return 'error';
-    case 'shipped':
-      return 'info';
-    case 'inactive':
-    case 'failed':
-    case 'cancelled':
-      return 'default';
-    default:
-      return 'default';
-  }
-};
-
-const getPaymentStatusColor = (status) => {
-  switch (status) {
-    case 'paid':
-      return 'success';
-    case 'pending':
-      return 'warning';
-    case 'failed':
-      return 'error';
-    case 'refunded':
-      return 'info';
-    default:
-      return 'default';
-  }
-};
-
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-};
-
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD'
-  }).format(amount);
+  return fieldMap[header] || 'N/A';
 };
 
 const AdminDashboardContent = () => {
@@ -1055,31 +882,6 @@ const AdminDashboardContent = () => {
     }
   };
 
-  const handleUpdatePaymentStatus = async (orderId, newPaymentStatus) => {
-    if (!orderId) {
-      showSnackbar('Invalid order ID', 'error');
-      return;
-    }
-
-    try {
-      const response = await orderService.updatePaymentStatus(orderId, newPaymentStatus);
-      if (response.success) {
-        showSnackbar('Payment status updated successfully!');
-        await loadOrders();
-        await loadPayments();
-        await loadStats();
-        if (orderDialogOpen) {
-          setOrderDialogOpen(false);
-        }
-      } else {
-        showSnackbar('Failed to update payment status', 'error');
-      }
-    } catch (error) {
-      console.error('Failed to update payment status:', error);
-      showSnackbar('Failed to update payment status', 'error');
-    }
-  };
-
   const handleUpdateOrder = async () => {
     if (!selectedOrder) return;
 
@@ -1346,6 +1148,186 @@ const AdminDashboardContent = () => {
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed':
+      case 'active':
+      case 'read':
+      case 'replied':
+      case 'paid':
+        return 'success';
+      case 'in-progress':
+        return 'warning';
+      case 'pending':
+      case 'unread':
+        return 'error';
+      case 'shipped':
+        return 'info';
+      case 'inactive':
+      case 'failed':
+      case 'cancelled':
+        return 'default';
+      default:
+        return 'default';
+    }
+  };
+
+  const getPaymentStatusColor = (status) => {
+    switch (status) {
+      case 'paid':
+        return 'success';
+      case 'pending':
+        return 'warning';
+      case 'failed':
+        return 'error';
+      case 'refunded':
+        return 'info';
+      default:
+        return 'default';
+    }
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+
+  // Mobile Card Renderer for Orders
+  const renderOrderMobileCard = (order) => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box>
+          <Typography variant="subtitle1" fontWeight="600">
+            {order.customerName}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {order.customerEmail}
+          </Typography>
+        </Box>
+        <Chip 
+          label={order.status} 
+          size="small" 
+          color={getStatusColor(order.status)}
+        />
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="body2">
+          {order.serviceName}
+        </Typography>
+        <Typography variant="body1" fontWeight="600">
+          {formatCurrency(order.totalPrice)}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="caption" color="textSecondary">
+          {formatDate(order.createdAt)}
+        </Typography>
+        <Chip 
+          label={order.paymentStatus} 
+          size="small" 
+          color={getPaymentStatusColor(order.paymentStatus)}
+          variant="outlined"
+        />
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+        <Button 
+          size="small" 
+          startIcon={<ViewIcon />}
+          onClick={() => handleViewOrder(order)}
+          variant="outlined"
+          sx={{ flex: 1 }}
+        >
+          View
+        </Button>
+        <Button 
+          size="small" 
+          startIcon={<UpdateIcon />}
+          onClick={() => handleUpdateOrderStatus(order._id, 
+            order.status === 'pending' ? 'in-progress' : 
+            order.status === 'in-progress' ? 'completed' : 'pending'
+          )}
+          variant="outlined"
+          sx={{ flex: 1 }}
+        >
+          Update Status
+        </Button>
+        <IconButton 
+          size="small" 
+          color="error"
+          onClick={() => handleDeleteOrder(order._id)}
+        >
+          <DeleteIcon />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+
+  // Mobile Card Renderer for Payments
+  const renderPaymentMobileCard = (payment) => (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box>
+          <Typography variant="subtitle1" fontWeight="600">
+            {payment.tx_ref?.slice(-12)}
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            {payment.orderId?.customerName || 'N/A'}
+          </Typography>
+        </Box>
+        <Chip 
+          label={payment.status} 
+          size="small" 
+          color={getPaymentStatusColor(payment.status)}
+        />
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="body2">
+          {formatCurrency(payment.amount)}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          {payment.paymentMethod}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <Typography variant="caption" color="textSecondary">
+          {formatDate(payment.createdAt)}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+        <Button 
+          size="small" 
+          startIcon={<ViewIcon />}
+          onClick={() => {
+            setSelectedPayment(payment);
+            setPaymentDialogOpen(true);
+          }}
+          variant="outlined"
+          sx={{ flex: 1 }}
+        >
+          View
+        </Button>
+      </Box>
+    </Box>
+  );
+
   // Enhanced Mobile App Bar
   const MobileAppBar = () => (
     <AppBar 
@@ -1487,41 +1469,13 @@ const AdminDashboardContent = () => {
             Customer orders will appear here once they start placing orders.
           </Typography>
         </Paper>
-      ) : isMobile ? (
-        // Mobile view with cards
-        <Box>
-          {orders.map((order) => (
-            <MobileOrderCard
-              key={order._id}
-              order={order}
-              onView={handleViewOrder}
-              onUpdateStatus={handleUpdateOrderStatus}
-              onDelete={handleDeleteOrder}
-            />
-          ))}
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={totalOrders}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            sx={{
-              '& .MuiTablePagination-toolbar': {
-                flexDirection: isMobile ? 'column' : 'row',
-                gap: isMobile ? 2 : 1
-              }
-            }}
-          />
-        </Box>
       ) : (
-        // Desktop view with table
         <Box>
           <ResponsiveTable 
             headers={['Order ID', 'Customer', 'Service', 'Amount', 'Status', 'Payment', 'Date', 'Actions']}
             data={orders}
             loading={loading}
+            renderMobileCard={renderOrderMobileCard}
           >
             {orders.map((order) => (
               <TableRow key={order._id} hover>
@@ -1691,43 +1645,13 @@ const AdminDashboardContent = () => {
             Payment records will appear here once customers start making payments.
           </Typography>
         </Paper>
-      ) : isMobile ? (
-        // Mobile view with cards
-        <Box>
-          {payments.map((payment) => (
-            <MobilePaymentCard
-              key={payment._id}
-              payment={payment}
-              onView={(payment) => {
-                setSelectedPayment(payment);
-                setPaymentDialogOpen(true);
-              }}
-              onMarkAsPaid={(orderId) => handleUpdatePaymentStatus(orderId, 'paid')}
-            />
-          ))}
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={totalPayments}
-            rowsPerPage={paymentRowsPerPage}
-            page={paymentPage}
-            onPageChange={handlePaymentChangePage}
-            onRowsPerPageChange={handlePaymentChangeRowsPerPage}
-            sx={{
-              '& .MuiTablePagination-toolbar': {
-                flexDirection: isMobile ? 'column' : 'row',
-                gap: isMobile ? 2 : 1
-              }
-            }}
-          />
-        </Box>
       ) : (
-        // Desktop view with table
         <Box>
           <ResponsiveTable 
             headers={['Transaction ID', 'Order ID', 'Customer', 'Amount', 'Status', 'Method', 'Date', 'Actions']}
             data={payments}
             loading={loading}
+            renderMobileCard={renderPaymentMobileCard}
           >
             {payments.map((payment) => (
               <TableRow key={payment._id} hover>
@@ -1786,17 +1710,6 @@ const AdminDashboardContent = () => {
                         <ViewIcon fontSize={isSmallMobile ? "small" : "medium"} />
                       </IconButton>
                     </Tooltip>
-                    {payment.status === 'pending' && payment.orderId?._id && (
-                      <Tooltip title="Mark as Paid">
-                        <IconButton 
-                          size="small" 
-                          color="success"
-                          onClick={() => handleUpdatePaymentStatus(payment.orderId._id, 'paid')}
-                        >
-                          <CheckCircleIcon fontSize={isSmallMobile ? "small" : "medium"} />
-                        </IconButton>
-                      </Tooltip>
-                    )}
                   </Box>
                 </TableCell>
               </TableRow>
@@ -2478,6 +2391,7 @@ const AdminDashboardContent = () => {
           onTabChange={handleTabChange}
         />
 
+        {/* All Dialogs remain the same as before */}
         {/* Order Detail Dialog */}
         <Dialog 
           open={orderDialogOpen} 
@@ -2485,162 +2399,1109 @@ const AdminDashboardContent = () => {
           maxWidth="md" 
           fullWidth
           fullScreen={isMobile}
+          PaperProps={{
+            sx: {
+              borderRadius: isMobile ? 0 : 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+              overflow: 'hidden'
+            }
+          }}
         >
-          <DialogTitle>
-            Order Details
-          </DialogTitle>
-          <DialogContent>
-            {selectedOrder && (
-              <Box>
-                <Typography>Order ID: {selectedOrder._id}</Typography>
-                <Typography>Customer: {selectedOrder.customerName}</Typography>
-                <Typography>Status: {selectedOrder.status}</Typography>
-                {/* Add more order details as needed */}
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setOrderDialogOpen(false)}>Close</Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Payment Detail Dialog */}
-        <Dialog 
-          open={paymentDialogOpen} 
-          onClose={() => setPaymentDialogOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-        >
-          <DialogTitle>
-            Payment Details
-          </DialogTitle>
-          <DialogContent>
-            {selectedPayment && (
-              <Box>
-                <Typography>Transaction ID: {selectedPayment.tx_ref}</Typography>
-                <Typography>Amount: {formatCurrency(selectedPayment.amount)}</Typography>
-                <Typography>Status: {selectedPayment.status}</Typography>
-                {/* Add more payment details as needed */}
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setPaymentDialogOpen(false)}>Close</Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Gallery Dialog */}
-        <Dialog 
-          open={galleryDialogOpen} 
-          onClose={() => setGalleryDialogOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-        >
-          <DialogTitle>
-            {selectedGalleryItem ? 'Edit Gallery Item' : 'Add New Gallery Item'}
-          </DialogTitle>
-          <DialogContent>
-            <Box sx={{ mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Title"
-                value={galleryForm.title}
-                onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })}
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                label="Description"
-                value={galleryForm.description}
-                onChange={(e) => setGalleryForm({ ...galleryForm, description: e.target.value })}
-                sx={{ mb: 2 }}
-              />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileSelect}
-                style={{ marginBottom: '16px' }}
-              />
-              {uploading && <LinearProgress />}
+          <DialogTitle 
+            sx={{ 
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              color: 'white',
+              py: 3,
+              textAlign: 'center',
+              position: 'relative',
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '60px',
+                height: '4px',
+                backgroundColor: 'rgba(255,255,255,0.5)',
+                borderRadius: 2
+              }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {isMobile && (
+                <IconButton onClick={() => setOrderDialogOpen(false)} sx={{ color: 'white' }}>
+                  <CloseIcon />
+                </IconButton>
+              )}
+              <Typography variant="h5" component="h2" sx={{ 
+                fontWeight: 700, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: 2,
+                flex: 1
+              }}>
+                <OrderIcon sx={{ fontSize: 28 }} />
+                Order Details
+              </Typography>
+              {isMobile && <Box sx={{ width: 40 }} />} {/* Spacer for alignment */}
             </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setGalleryDialogOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={handleGallerySubmit}
-              variant="contained"
-              disabled={!galleryForm.imageUrl || !galleryForm.title}
-            >
-              {selectedGalleryItem ? 'Update' : 'Create'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Message Dialog */}
-        <Dialog 
-          open={messageDialogOpen} 
-          onClose={() => setMessageDialogOpen(false)} 
-          maxWidth="md" 
-          fullWidth
-        >
-          <DialogTitle>
-            Message Details
           </DialogTitle>
-          <DialogContent>
-            {selectedMessage && (
-              <Box>
-                <Typography variant="h6">{selectedMessage.subject}</Typography>
-                <Typography>From: {selectedMessage.name} ({selectedMessage.email})</Typography>
-                <Typography sx={{ mt: 2 }}>{selectedMessage.message}</Typography>
-              </Box>
+          
+          <DialogContent sx={{ p: isMobile ? 2 : 4 }}>
+            {selectedOrder && (
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  {/* Customer Information */}
+                  <Box sx={{ 
+                    mb: 3, 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                      Customer Information
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Name:</strong> {selectedOrder.customerName}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Email:</strong> {selectedOrder.customerEmail}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Phone:</strong> {selectedOrder.orderDetails?.phone || 'Not provided'}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Address:</strong> {selectedOrder.orderDetails?.address || 'Not provided'}
+                    </Typography>
+                  </Box>
+
+                  {/* Order Information */}
+                  <Box sx={{ 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                      Order Information
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Service:</strong> {selectedOrder.serviceName}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Order ID:</strong> {selectedOrder._id}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Date:</strong> {formatDate(selectedOrder.createdAt)}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Total Amount:</strong> {formatCurrency(selectedOrder.totalPrice)}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
+                      <Chip 
+                        label={selectedOrder.status} 
+                        color={getStatusColor(selectedOrder.status)}
+                      />
+                      <Chip 
+                        label={selectedOrder.paymentStatus} 
+                        color={getPaymentStatusColor(selectedOrder.paymentStatus)}
+                      />
+                    </Box>
+                  </Box>
+                </Grid>
+
+                <Grid item xs={12} md={6}>
+                  {/* Update Order Section */}
+                  <Box sx={{ 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                      Update Order
+                    </Typography>
+                    
+                    <TextField
+                      fullWidth
+                      select
+                      label="Status"
+                      value={orderForm.status}
+                      onChange={(e) => setOrderForm({ ...orderForm, status: e.target.value })}
+                      sx={{ mb: 2 }}
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="in-progress">In Progress</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                      <MenuItem value="cancelled">Cancelled</MenuItem>
+                    </TextField>
+
+                    <TextField
+                      fullWidth
+                      select
+                      label="Payment Status"
+                      value={orderForm.paymentStatus}
+                      onChange={(e) => setOrderForm({ ...orderForm, paymentStatus: e.target.value })}
+                      sx={{ mb: 2 }}
+                    >
+                      <MenuItem value="pending">Pending</MenuItem>
+                      <MenuItem value="paid">Paid</MenuItem>
+                      <MenuItem value="failed">Failed</MenuItem>
+                      <MenuItem value="refunded">Refunded</MenuItem>
+                    </TextField>
+
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Total Price"
+                      value={orderForm.totalPrice}
+                      onChange={(e) => setOrderForm({ ...orderForm, totalPrice: parseFloat(e.target.value) })}
+                      sx={{ mb: 2 }}
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
+                    />
+
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Special Instructions"
+                      value={orderForm.specialInstructions}
+                      onChange={(e) => setOrderForm({ ...orderForm, specialInstructions: e.target.value })}
+                    />
+                  </Box>
+
+                  {/* Service Options */}
+                  {selectedOrder.selectedOptions && (
+                    <Box sx={{ 
+                      mt: 3, 
+                      p: 3, 
+                      backgroundColor: 'white', 
+                      borderRadius: 3,
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                    }}>
+                      <Typography variant="h6" sx={{ mb: 2, color: theme.palette.primary.main, fontWeight: 600 }}>
+                        Service Options
+                      </Typography>
+                      <List dense>
+                        {Object.entries(selectedOrder.selectedOptions).map(([key, value]) => (
+                          <ListItem key={key}>
+                            <ListItemText 
+                              primary={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                              secondary={String(value)}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </Box>
+                  )}
+                </Grid>
+              </Grid>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setMessageDialogOpen(false)}>Close</Button>
-            <Button onClick={() => handleReply(selectedMessage)} variant="contained">
-              Reply
+          
+          <DialogActions sx={{ 
+            p: 3, 
+            backgroundColor: 'white',
+            borderTop: `1px solid ${theme.palette.divider}`,
+            gap: 2,
+            flexDirection: isMobile ? 'column' : 'row'
+          }}>
+            <Button 
+              onClick={() => setOrderDialogOpen(false)}
+              variant="outlined"
+              size="large"
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1,
+                borderColor: theme.palette.grey[400],
+                color: theme.palette.text.primary,
+                '&:hover': {
+                  borderColor: theme.palette.grey[600],
+                  backgroundColor: 'rgba(0,0,0,0.02)'
+                },
+                width: isMobile ? '100%' : 'auto'
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="contained" 
+              onClick={handleUpdateOrder}
+              size="large"
+              startIcon={<UpdateIcon />}
+              sx={{
+                borderRadius: 2,
+                px: 4,
+                py: 1,
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                '&:hover': {
+                  boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                  transform: 'translateY(-1px)'
+                },
+                transition: 'all 0.3s ease',
+                width: isMobile ? '100%' : 'auto'
+              }}
+            >
+              Update Order
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Reply Dialog */}
-        <Dialog 
-          open={replyDialogOpen} 
-          onClose={() => setReplyDialogOpen(false)} 
-          maxWidth="sm" 
-          fullWidth
+      {/* Payment Detail Dialog */}
+      <Dialog 
+        open={paymentDialogOpen} 
+        onClose={() => setPaymentDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '60px',
+              height: '4px',
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              borderRadius: 2
+            }
+          }}
         >
-          <DialogTitle>
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <CreditCardIcon sx={{ fontSize: 28 }} />
+            Payment Details
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          {selectedPayment && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  mb: 3, 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                    Payment Information
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Transaction ID:</strong> {selectedPayment.tx_ref}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Chapa Transaction ID:</strong> {selectedPayment.chapaTransactionId || 'N/A'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Amount:</strong> {formatCurrency(selectedPayment.amount)}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Currency:</strong> {selectedPayment.currency}
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1 }}>
+                    <strong>Status:</strong> 
+                    <Chip 
+                      label={selectedPayment.status} 
+                      size="small" 
+                      color={getPaymentStatusColor(selectedPayment.status)}
+                      sx={{ ml: 1 }}
+                    />
+                  </Typography>
+                  <Typography variant="body2">
+                    <strong>Payment Method:</strong> {selectedPayment.paymentMethod}
+                  </Typography>
+                  {selectedPayment.testMode && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        This is a test payment (Sandbox Mode)
+                      </Typography>
+                    </Alert>
+                  )}
+                </Box>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <Box sx={{ 
+                  p: 3, 
+                  backgroundColor: 'white', 
+                  borderRadius: 3,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                }}>
+                  <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                    Order Information
+                  </Typography>
+                  {selectedPayment.orderId ? (
+                    <>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Order ID:</strong> {selectedPayment.orderId._id}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Customer:</strong> {selectedPayment.orderId.customerName}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Service:</strong> {selectedPayment.orderId.serviceName}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        <strong>Order Status:</strong> 
+                        <Chip 
+                          label={selectedPayment.orderId.status} 
+                          size="small" 
+                          color={getStatusColor(selectedPayment.orderId.status)}
+                          sx={{ ml: 1 }}
+                        />
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Payment Status:</strong> 
+                        <Chip 
+                          label={selectedPayment.orderId.paymentStatus} 
+                          size="small" 
+                          color={getPaymentStatusColor(selectedPayment.orderId.paymentStatus)}
+                          sx={{ ml: 1 }}
+                        />
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="textSecondary">
+                      Order information not available
+                    </Typography>
+                  )}
+                </Box>
+
+                {(selectedPayment.paidAt || selectedPayment.createdAt) && (
+                  <Box sx={{ 
+                    mt: 3, 
+                    p: 3, 
+                    backgroundColor: 'white', 
+                    borderRadius: 3,
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+                  }}>
+                    <Typography variant="h6" sx={{ mb: 2, color: theme.palette.success.main, fontWeight: 600 }}>
+                      Payment Timeline
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      <strong>Created:</strong> {formatDate(selectedPayment.createdAt)}
+                    </Typography>
+                    {selectedPayment.paidAt && (
+                      <Typography variant="body2">
+                        <strong>Paid At:</strong> {formatDate(selectedPayment.paidAt)}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setPaymentDialogOpen(false)}
+            variant="outlined"
+            size="large"
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Gallery Item Dialog */}
+      <Dialog 
+        open={galleryDialogOpen} 
+        onClose={() => setGalleryDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle 
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center',
+            position: 'relative',
+            '&::after': {
+              content: '""',
+              position: 'absolute',
+              bottom: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '60px',
+              height: '4px',
+              backgroundColor: 'rgba(255,255,255,0.5)',
+              borderRadius: 2
+            }
+          }}
+        >
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <PhotoIcon sx={{ fontSize: 28 }} />
+            {selectedGalleryItem ? 'Edit Gallery Item' : 'Add New Gallery Item'}
+          </Typography>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          <Grid container spacing={3}>
+            {/* Image Upload Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `2px dashed ${alpha(theme.palette.primary.main, 0.3)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                textAlign: 'center',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  borderColor: theme.palette.primary.main,
+                  backgroundColor: alpha(theme.palette.primary.main, 0.04)
+                }
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 2, 
+                  color: theme.palette.primary.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <CloudUploadIcon fontSize="small" />
+                  Upload Image
+                </Typography>
+                
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                  id="image-upload-input"
+                />
+                <label htmlFor="image-upload-input">
+                  <Button
+                    variant="contained"
+                    component="span"
+                    startIcon={<CloudUploadIcon />}
+                    disabled={uploading}
+                    sx={{
+                      borderRadius: 2,
+                      px: 4,
+                      py: 1.5,
+                      mb: 2,
+                      background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                      '&:hover': {
+                        boxShadow: '0 6px 20px rgba(0,0,0,0.15)'
+                      }
+                    }}
+                  >
+                    {uploading ? 'Uploading...' : 'Choose Image File'}
+                  </Button>
+                </label>
+
+                {uploading && (
+                  <Box sx={{ width: '100%', mb: 2 }}>
+                    <LinearProgress />
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      Uploading image...
+                    </Typography>
+                  </Box>
+                )}
+
+                {galleryForm.imageUrl && !uploading && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: alpha(theme.palette.success.main, 0.1), borderRadius: 2 }}>
+                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 600 }}>
+                      ✓ Image uploaded successfully!
+                    </Typography>
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                      <PhotoIcon color="success" fontSize="small" />
+                      <Typography variant="caption" color="textSecondary">
+                        {galleryForm.imageUrl.split('/').pop()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                )}
+
+                {selectedFile && !uploading && (
+                  <Box sx={{ mt: 2, p: 2, backgroundColor: alpha(theme.palette.info.main, 0.1), borderRadius: 2 }}>
+                    <Typography variant="body2" color="info.main" sx={{ fontWeight: 600 }}>
+                      Selected: {selectedFile.name}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary">
+                      {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  </Box>
+                )}
+
+                {!galleryForm.imageUrl && !selectedFile && !uploading && (
+                  <Typography variant="body2" color="textSecondary">
+                    Click to select an image file (JPG, PNG, GIF, WebP - Max 10MB)
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+
+            {/* Basic Information Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 3, 
+                  color: theme.palette.primary.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <SettingsIcon fontSize="small" />
+                  Basic Information
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Image Title *"
+                      value={galleryForm.title}
+                      onChange={(e) => setGalleryForm({ ...galleryForm, title: e.target.value })}
+                      variant="outlined"
+                      placeholder="Enter a descriptive title for your image"
+                      required
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Description"
+                      value={galleryForm.description}
+                      onChange={(e) => setGalleryForm({ ...galleryForm, description: e.target.value })}
+                      variant="outlined"
+                      placeholder="Describe your image, including key features and context"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            </Grid>
+
+            {/* Category Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 3, 
+                  color: theme.palette.info.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <CategoryIcon fontSize="small" />
+                  Category
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Category *"
+                      value={galleryForm.category}
+                      onChange={(e) => setGalleryForm({ ...galleryForm, category: e.target.value })}
+                      variant="outlined"
+                      required
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    >
+                      <MenuItem value="Portrait">📷 Portrait</MenuItem>
+                      <MenuItem value="Landscape">🏞️ Landscape</MenuItem>
+                      <MenuItem value="Urban">🏙️ Urban</MenuItem>
+                      <MenuItem value="Nature">🌿 Nature</MenuItem>
+                      <MenuItem value="Architecture">🏛️ Architecture</MenuItem>
+                      <MenuItem value="Event">🎉 Event</MenuItem>
+                      <MenuItem value="Product">📦 Product</MenuItem>
+                      <MenuItem value="Wedding">💒 Wedding</MenuItem>
+                      <MenuItem value="Family">👨‍👩‍👧‍👦 Family</MenuItem>
+                      <MenuItem value="Other">🔹 Other</MenuItem>
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Grid>
+
+            {/* Pricing Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                mb: 3, 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `1px solid ${alpha(theme.palette.warning.main, 0.1)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 3, 
+                  color: theme.palette.warning.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <MoneyIcon fontSize="small" />
+                  Pricing (USD)
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Digital Download"
+                      value={galleryForm.pricing.digital}
+                      onChange={(e) => setGalleryForm({
+                        ...galleryForm,
+                        pricing: { ...galleryForm.pricing, digital: e.target.value }
+                      })}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Small Print (8x10)"
+                      value={galleryForm.pricing.smallPrint}
+                      onChange={(e) => setGalleryForm({
+                        ...galleryForm,
+                        pricing: { ...galleryForm.pricing, smallPrint: e.target.value }
+                      })}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Large Print (16x20)"
+                      value={galleryForm.pricing.largePrint}
+                      onChange={(e) => setGalleryForm({
+                        ...galleryForm,
+                        pricing: { ...galleryForm.pricing, largePrint: e.target.value }
+                      })}
+                      variant="outlined"
+                      InputProps={{
+                        startAdornment: <Typography sx={{ mr: 1, color: 'text.secondary' }}>$</Typography>
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            </Grid>
+
+            {/* Tags & Featured Section */}
+            <Grid item xs={12}>
+              <Box sx={{ 
+                p: 3, 
+                backgroundColor: 'white', 
+                borderRadius: 3,
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+              }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 3, 
+                  color: theme.palette.secondary.main,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  fontWeight: 600
+                }}>
+                  <LocalOfferIcon fontSize="small" />
+                  Tags & Settings
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      label="Tags (comma separated)"
+                      value={galleryForm.tags}
+                      onChange={(e) => setGalleryForm({ ...galleryForm, tags: e.target.value })}
+                      variant="outlined"
+                      placeholder="nature, landscape, sunset, mountains"
+                      helperText="Separate tags with commas"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: 2,
+                          backgroundColor: 'white'
+                        }
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      height: '100%',
+                      p: 2,
+                      backgroundColor: galleryForm.featured ? alpha(theme.palette.secondary.main, 0.08) : 'grey.50',
+                      borderRadius: 2,
+                      border: `2px dashed ${galleryForm.featured ? theme.palette.secondary.main : theme.palette.divider}`,
+                      transition: 'all 0.3s ease'
+                    }}>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={galleryForm.featured}
+                            onChange={(e) => setGalleryForm({ ...galleryForm, featured: e.target.checked })}
+                            color="secondary"
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography variant="body1" fontWeight={600}>
+                              Featured Image
+                            </Typography>
+                            <Typography variant="caption" color="textSecondary">
+                              Show this image prominently
+                            </Typography>
+                          </Box>
+                        }
+                      />
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setGalleryDialogOpen(false)}
+            variant="outlined"
+            size="large"
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              borderColor: theme.palette.grey[400],
+              color: theme.palette.text.primary,
+              '&:hover': {
+                borderColor: theme.palette.grey[600],
+                backgroundColor: 'rgba(0,0,0,0.02)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            variant="contained" 
+            onClick={handleGallerySubmit}
+            size="large"
+            disabled={!galleryForm.imageUrl || !galleryForm.title || !galleryForm.category}
+            startIcon={selectedGalleryItem ? <EditIcon /> : <AddIcon />}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+              boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+              '&:hover': {
+                boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                transform: 'translateY(-1px)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[400],
+                boxShadow: 'none'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {selectedGalleryItem ? 'Update Image' : 'Create Image'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Message Detail Dialog */}
+      <Dialog 
+        open={messageDialogOpen} 
+        onClose={() => setMessageDialogOpen(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f0f4ff 0%, #e6f0ff 100%)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.info.main} 0%, ${theme.palette.primary.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center'
+          }}
+        >
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <EmailIcon sx={{ fontSize: 28 }} />
+            Message Details
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 4 }}>
+          {selectedMessage && (
+            <Box sx={{ 
+              p: 3, 
+              backgroundColor: 'white', 
+              borderRadius: 3,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+            }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
+                {selectedMessage.subject || 'General Inquiry'}
+              </Typography>
+              <Box sx={{ mb: 3, p: 2, backgroundColor: alpha(theme.palette.info.main, 0.05), borderRadius: 2 }}>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  <strong>From:</strong> {selectedMessage.name}
+                </Typography>
+                <Typography variant="body2" color="textSecondary" gutterBottom>
+                  <strong>Email:</strong> {selectedMessage.email}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  <strong>Phone:</strong> {selectedMessage.phone || 'Not provided'}
+                </Typography>
+              </Box>
+              <Box sx={{ mb: 3, p: 3, backgroundColor: 'grey.50', borderRadius: 2, borderLeft: `4px solid ${theme.palette.primary.main}` }}>
+                <Typography variant="body1">
+                  {selectedMessage.message}
+                </Typography>
+              </Box>
+              <Typography variant="caption" color="textSecondary">
+                Received: {formatDate(selectedMessage.createdAt)}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setMessageDialogOpen(false)}
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Close
+          </Button>
+          <Button 
+            onClick={() => handleReply(selectedMessage)}
+            variant="contained"
+            startIcon={<ReplyIcon />}
+            sx={{ 
+              borderRadius: 2, 
+              px: 3,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`
+            }}
+          >
+            Reply
+          </Button>
+          <Button 
+            onClick={() => handleDeleteMessage(selectedMessage?._id)}
+            color="error"
+            variant="outlined"
+            startIcon={<DeleteIcon />}
+            sx={{ borderRadius: 2, px: 3 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Enhanced Reply Dialog */}
+      <Dialog 
+        open={replyDialogOpen} 
+        onClose={() => setReplyDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #e4eaf1 100%)',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <DialogTitle
+          sx={{ 
+            background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+            color: 'white',
+            py: 3,
+            textAlign: 'center'
+          }}
+        >
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+            <ReplyIcon sx={{ fontSize: 28 }} />
             Reply to Message
-          </DialogTitle>
-          <DialogContent>
+          </Typography>
+        </DialogTitle>
+        <DialogContent sx={{ p: 4 }}>
+          <Box sx={{ 
+            p: 3, 
+            backgroundColor: 'white', 
+            borderRadius: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+          }}>
             <TextField
               autoFocus
               multiline
-              rows={4}
+              rows={6}
               fullWidth
               variant="outlined"
-              label="Your reply"
+              label="Your reply message"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              sx={{ mt: 2 }}
+              placeholder="Type your response here..."
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: 2,
+                  backgroundColor: 'white'
+                }
+              }}
             />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setReplyDialogOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={handleSendReply} 
-              variant="contained"
-              disabled={!replyText.trim()}
-            >
-              Send Reply
-            </Button>
-          </DialogActions>
-        </Dialog>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ 
+          p: 3, 
+          backgroundColor: 'white',
+          borderTop: `1px solid ${theme.palette.divider}`,
+          gap: 2
+        }}>
+          <Button 
+            onClick={() => setReplyDialogOpen(false)}
+            variant="outlined"
+            sx={{ borderRadius: 2, px: 4 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSendReply} 
+            variant="contained"
+            disabled={!replyText.trim()}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.info.main} 100%)`,
+              boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+              '&:hover': {
+                boxShadow: '0 6px 20px rgba(0,0,0,0.3)'
+              },
+              '&:disabled': {
+                background: theme.palette.grey[400]
+              }
+            }}
+          >
+            Send Reply
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-        {/* Snackbar */}
+        {/* Enhanced Snackbar */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
@@ -2650,6 +3511,13 @@ const AdminDashboardContent = () => {
           <Alert 
             severity={snackbar.severity} 
             onClose={() => setSnackbar({ ...snackbar, open: false })}
+            sx={{ 
+              boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
+              borderRadius: 2,
+              alignItems: 'center',
+              fontSize: '0.9rem',
+              width: isMobile ? '90%' : 'auto'
+            }}
           >
             {snackbar.message}
           </Alert>
